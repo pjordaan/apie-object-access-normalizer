@@ -11,7 +11,7 @@ env:
   - SYMFONY_VERSION=5.1
   - SYMFONY_VERSION=dev-master
 install:
-  - "composer require symfony/cache:${SYMFONY_VERSION} symfony/finder:${SYMFONY_VERSION} symfony/http-kernel:${SYMFONY_VERSION} symfony/property-access:${SYMFONY_VERSION} symfony/property-info:${SYMFONY_VERSION} symfony/serializer:${SYMFONY_VERSION} --no-update --ignore-platform-reqs"
+  - "composer require symfony/cache:${SYMFONY_VERSION} symfony/http-kernel:${SYMFONY_VERSION} symfony/property-access:${SYMFONY_VERSION} symfony/property-info:${SYMFONY_VERSION} symfony/serializer:${SYMFONY_VERSION} --no-update --ignore-platform-reqs"
   - "composer install --ignore-platform-reqs"
 jobs:
   allow_failures:
