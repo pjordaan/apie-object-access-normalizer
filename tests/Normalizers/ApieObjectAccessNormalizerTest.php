@@ -152,12 +152,6 @@ class ApieObjectAccessNormalizerTest extends TestCase
             ['uuid' => 'this value is not correct', 'valueObject' => ''],
             ClassWithValueObject::class,
         ];
-        // object with no normalization configured
-        yield [
-            ['valueObject' => ['Could not denormalize object of type "W2w\Test\ApieObjectAccessNormalizer\Mocks\ValueObject", no supporting normalizer found.']],
-            ['uuid' => '986e12c4-3011-4ed8-aead-c62b76bb7f69', 'valueObject' => ''],
-            ClassWithValueObject::class,
-        ];
 
         // no typehints, but still required in constructor
         yield [
