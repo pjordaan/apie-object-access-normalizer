@@ -3,35 +3,50 @@
 namespace W2w\Test\ApieObjectAccessNormalizer\Normalizers;
 
 use DateTimeImmutable;
+use Doctrine\Common\Annotations\AnnotationReader;
+use Doctrine\Common\Annotations\AnnotationRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
+use Symfony\Component\Serializer\Mapping\Loader\AnnotationLoader;
+use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
+use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
+use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
 use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Serializer;
 use W2w\Lib\Apie\Plugins\Uuid\Normalizers\UuidNormalizer;
 use W2w\Lib\Apie\Plugins\ValueObject\Normalizers\ValueObjectNormalizer;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
 use W2w\Lib\ApieObjectAccessNormalizer\Normalizers\ApieObjectAccessNormalizer;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithConflictingTypehints;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithMultipleTypes;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithNoTypehints;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithoutConstructorTypehint;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithoutProperties;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithPhp74PropertyTypehint;
+use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithSerializationGroup;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithSubclass;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithTypedArrayTypehint;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithValueObject;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\FullRestObject;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\RecursiveObject;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\SumExample;
-use W2w\Test\ApieObjectAccessNormalizer\Mocks\ValueObject;
 
 class ApieObjectAccessNormalizerTest extends TestCase
 {
-    private function createSerializer(): Serializer
+    private function createSerializer(ObjectAccessInterface $objectAccess = null, NameConverterInterface $nameConverter = null): Serializer
     {
+        $factory = new ClassMetadataFactory(new AnnotationLoader(new AnnotationReader()));
         return new Serializer(
-            [new UuidNormalizer(), new DateTimeNormalizer(), new ValueObjectNormalizer(), new ApieObjectAccessNormalizer()],
+            [
+                new UuidNormalizer(),
+                new DateTimeNormalizer(),
+                new ValueObjectNormalizer(),
+                new ApieObjectAccessNormalizer($objectAccess, $nameConverter, $factory),
+                new ArrayDenormalizer(),
+            ],
             [new JsonEncoder()]
         );
     }
@@ -308,6 +323,31 @@ class ApieObjectAccessNormalizerTest extends TestCase
             $object,
         ];
 
+        $object = new ClassWithSerializationGroup();
+        $object->value1 = new ClassWithSerializationGroup();
+        $object->value2 = [new ClassWithNoTypehints('salami')];
+        $object->value3 = new ClassWithNoTypehints(42);
+        yield [
+            [
+                'value1' => [
+                    'value1' => null,
+                    'value2' => [],
+                    'value3' => null,
+                ],
+                'value2' => [
+                    [
+                        'noTypehint' => 'salami',
+                        'alsoNoTypehint' => null,
+                    ]
+                ],
+                'value3' => [
+                    'noTypehint' => 42,
+                    'alsoNoTypehint' => null,
+                ]
+            ],
+            $object
+        ];
+
         // PHP 7.4 property typehint
         if (PHP_VERSION_ID >= 70400) {
             $object = new ClassWithPhp74PropertyTypehint();
@@ -316,6 +356,87 @@ class ApieObjectAccessNormalizerTest extends TestCase
                 ['property' => 42],
                 $object,
             ];
+        }
+    }
+
+    public function testNormalizeWithOtherNameConverter()
+    {
+        $serializer = $this->createSerializer(null, new CamelCaseToSnakeCaseNameConverter());
+        $expected = [
+            'also_no_typehint' => null,
+            'no_typehint' => 'pizza',
+        ];
+        $this->assertEquals($expected, $serializer->normalize(new ClassWithNoTypehints('pizza')));
+    }
+
+    public function testDenormalizeWithOtherNameConverter()
+    {
+        $serializer = $this->createSerializer(null, new CamelCaseToSnakeCaseNameConverter());
+        $expected = new ClassWithNoTypehints('pizza');
+        $input = [
+            'also_no_typehint' => null,
+            'no_typehint' => 'pizza',
+        ];
+        $this->assertEquals($expected, $serializer->denormalize($input, ClassWithNoTypehints::class));
+    }
+
+    public function testNormalizeWithOtherNameConverterAndGroups()
+    {
+        AnnotationRegistry::registerLoader('class_exists');
+        $serializer = $this->createSerializer(null, new CamelCaseToSnakeCaseNameConverter());
+        $expected = [
+        ];
+        $this->assertEquals($expected, $serializer->normalize(new ClassWithNoTypehints('pizza'), null, ['groups' => ['missing']]));
+        $expected = [
+            'value1' => [
+                'value1' => null,
+                'value2' => [],
+            ],
+            'value2' => [[]],
+        ];
+        $object = new ClassWithSerializationGroup();
+        $object->value1 = new ClassWithSerializationGroup();
+        $object->value2 = [new ClassWithNoTypehints('salami')];
+        $object->value3 = new ClassWithNoTypehints(42);
+        $this->assertEquals($expected, $serializer->normalize($object, null, ['groups' => ['missing']]));
+    }
+
+    public function testDenormalizeWithOtherNameConverterAndGroups()
+    {
+        try {
+            AnnotationRegistry::registerLoader('class_exists');
+            $serializer = $this->createSerializer(null, new CamelCaseToSnakeCaseNameConverter());
+            $expected = new ClassWithNoTypehints('pizza');
+            $input = [
+                'also_no_typehint' => null,
+                'no_typehint'      => 'pizza',
+            ];
+            $this->assertEquals(
+                $expected, $serializer->denormalize(
+                $input, ClassWithNoTypehints::class, null, ['groups' => ['missing']]
+            )
+            );
+
+            $input = [
+                'value1' => [
+                    'value1' => null,
+                    'value2' => [],
+                ],
+                'value2' => [$input],
+                'value3' => [
+                    'no_typehint' => 42,
+                ],
+            ];
+            $expected = new ClassWithSerializationGroup();
+            $expected->value1 = new ClassWithSerializationGroup();
+            $expected->value2 = [new ClassWithNoTypehints('pizza')];
+            $this->assertEquals(
+                $expected, $serializer->denormalize(
+                $input, ClassWithSerializationGroup::class, null, ['groups' => ['missing']]
+            )
+            );
+        } catch (ValidationException $validationException) {
+            $this->fail('Did not expect a validation error, got: ' . json_encode($validationException->getErrors()));
         }
     }
 }

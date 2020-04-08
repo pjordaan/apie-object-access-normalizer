@@ -1,6 +1,5 @@
 <?php
 
-
 namespace W2w\Lib\ApieObjectAccessNormalizer;
 
 use ReflectionClass;

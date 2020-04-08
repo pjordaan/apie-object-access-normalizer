@@ -6,6 +6,9 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\Normalizers;
 use ReflectionClass;
 use Symfony\Component\PropertyInfo\Type;
 use Symfony\Component\Serializer\Exception\MissingConstructorArgumentsException;
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
+use Symfony\Component\Serializer\NameConverter\AdvancedNameConverterInterface;
+use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Serializer\SerializerAwareInterface;
@@ -14,6 +17,8 @@ use Throwable;
 use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\CouldNotConvertException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
+use W2w\Lib\ApieObjectAccessNormalizer\NameConverters\NullNameConverter;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\FilteredObjectAccess;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccess;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
 use W2w\Lib\ApieObjectAccessNormalizer\Utils;
@@ -27,9 +32,24 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
      */
     private $objectAccess;
 
-    public function __construct(ObjectAccessInterface $objectAccess = null)
-    {
+    /**
+     * @var NameConverterInterface|AdvancedNameConverterInterface
+     */
+    private $nameConverter;
+
+    /**
+     * @var ClassMetadataFactoryInterface|null
+     */
+    private $classMetadataFactory;
+
+    public function __construct(
+        ObjectAccessInterface $objectAccess = null,
+        NameConverterInterface $nameConverter = null,
+        ClassMetadataFactoryInterface $classMetadataFactory = null
+    ) {
         $this->objectAccess = $objectAccess ?? new ObjectAccess();
+        $this->nameConverter = $nameConverter ?? new NullNameConverter();
+        $this->classMetadataFactory = $classMetadataFactory;
     }
 
     public function denormalize($data, $type, $format = null, array $context = [])
@@ -42,19 +62,28 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         }
         /** @var ObjectAccessInterface $objectAccess */
         $objectAccess = $context['object_access'];
+        if ($this->classMetadataFactory && isset($context['groups'])) {
+            $objectAccess = $this->filterObjectAccess($objectAccess, $type, $context['groups']);
+        }
         $reflClass = new ReflectionClass($object);
         $setterFields = $objectAccess->getSetterFields($reflClass);
         $errors = new ErrorBag($context['key_prefix']);
-        foreach ($setterFields as $fieldName) {
+        foreach ($setterFields as $denormalizedFieldName) {
+            try {
+                $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
+            } catch (Throwable $throwable) {
+                $errors->addThrowable($denormalizedFieldName, $throwable);
+                continue;
+            }
             if (!array_key_exists($fieldName, $data)) {
                 continue;
             }
             $succeeded = false;
             $foundErrors = [];
-            foreach ($objectAccess->getGetterTypes($reflClass, $fieldName) as $type) {
+            foreach ($objectAccess->getGetterTypes($reflClass, $denormalizedFieldName) as $type) {
                 try {
-                    $result = $this->denormalizeType($data, $fieldName, $type, $format, $context);
-                    $objectAccess->setValue($object, $fieldName, $result);
+                    $result = $this->denormalizeType($data, $denormalizedFieldName, $type, $format, $context);
+                    $objectAccess->setValue($object, $denormalizedFieldName, $result);
                     $succeeded = true;
                 } catch (Throwable $throwable) {
                     $foundErrors[] = $throwable;
@@ -62,12 +91,12 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
             }
             if (!$succeeded) {
                 if ($foundErrors) {
-                    $errors->addThrowable($fieldName, reset($foundErrors));
+                    $errors->addThrowable($denormalizedFieldName, reset($foundErrors));
                 } else {
                     try {
-                        $objectAccess->setValue($object, $fieldName, $data[$fieldName]);
+                        $objectAccess->setValue($object, $denormalizedFieldName, $data[$fieldName]);
                     } catch (Throwable $throwable) {
-                        $errors->addThrowable($fieldName, $throwable);
+                        $errors->addThrowable($denormalizedFieldName, $throwable);
                     }
                 }
             }
@@ -128,19 +157,20 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         $argumentTypes = $objectAccess->getConstructorArguments(new ReflectionClass($type));
         $errors = new ErrorBag($context['key_prefix']);
         $parsedArguments = [];
-        foreach ($argumentTypes as $key => $argumentType) {
+        foreach ($argumentTypes as $denormalizedFieldName => $argumentType) {
             try {
+                $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
                 if ($argumentType) {
-                    $parsedArguments[] = $this->denormalizeType($data, $key, $argumentType, $format, $context);
+                    $parsedArguments[] = $this->denormalizeType($data, $fieldName, $argumentType, $format, $context);
                 } else {
-                    if (!array_key_exists($key, $data)) {
+                    if (!array_key_exists($fieldName, $data)) {
                         throw new MissingConstructorArgumentsException('required');
                     }
-                    $parsedArguments[] = $data[$key];
+                    $parsedArguments[] = $data[$fieldName];
 
                 }
             } catch (Throwable $throwable) {
-                $errors->addThrowable($key, $throwable);
+                $errors->addThrowable($denormalizedFieldName, $throwable);
             }
         }
         $errors = $errors->getErrors();
@@ -162,11 +192,29 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         /** @var ObjectAccessInterface $objectAccess */
         $objectAccess = $context['object_access'];
         $reflectionClass = new ReflectionClass($object);
+        if ($this->classMetadataFactory && isset($context['groups'])) {
+            $objectAccess = $this->filterObjectAccess($objectAccess, $reflectionClass->name, $context['groups']);
+        }
         $result = [];
-        foreach ($objectAccess->getGetterFields($reflectionClass) as $fieldName) {
-            $result[$fieldName] = $this->toPrimitive($objectAccess->getValue($object, $fieldName), $fieldName, $format, $context);
+        foreach ($objectAccess->getGetterFields($reflectionClass) as $denormalizedFieldName) {
+            $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $reflectionClass->name, $format, $context);
+            $result[$fieldName] = $this->toPrimitive($objectAccess->getValue($object, $denormalizedFieldName), $fieldName, $format, $context);
         }
         return $result;
+    }
+
+    private function filterObjectAccess(ObjectAccessInterface $objectAccess, string $className, array $groups): ObjectAccessInterface
+    {
+        $allowedAttributes = [];
+        foreach ($this->classMetadataFactory->getMetadataFor($className)->getAttributesMetadata() as $attributeMetadata) {
+            $name = $attributeMetadata->getName();
+
+            if (array_intersect($attributeMetadata->getGroups(), $groups)) {
+                $allowedAttributes[] = $name;
+            }
+        }
+
+        return new FilteredObjectAccess($objectAccess, $allowedAttributes);
     }
 
     private function toPrimitive($input, string $fieldName, ?string $format = null, array $context)
