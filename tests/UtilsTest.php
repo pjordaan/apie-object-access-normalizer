@@ -113,16 +113,16 @@ class UtilsTest extends TestCase
 
     public function toIntInvalidProvider()
     {
-        yield ['I expect int but got 1.5', 1.5];
-        yield ['I expect int but got "1.5"', '1.5'];
+        yield ['must be one of "int" ("1.5" given)', 1.5];
+        yield ['must be one of "int" ("1.5" given)', '1.5'];
         $resource = fopen(__FILE__, 'r');
         if ($resource !== false) {
             fclose($resource);
-            yield ['I expect int but got resource (closed)', $resource];
+            yield ['must be one of "int" ("resource (closed)" given)', $resource];
         }
-        yield ['I expect int but got object UtilsTest', $this];
-        yield ['I expect int but got "text"', 'text'];
-        yield ['I expect int but got "text"', new class() {
+        yield ['must be one of "int" ("object UtilsTest" given)', $this];
+        yield ['must be one of "int" ("text" given)', 'text'];
+        yield ['must be one of "int" ("text" given)', new class() {
             public function __toString()
             {
                 return 'text';
@@ -145,11 +145,11 @@ class UtilsTest extends TestCase
         $resource = fopen(__FILE__, 'r');
         if ($resource !== false) {
             fclose($resource);
-            yield ['I expect float but got resource (closed)', $resource];
+            yield ['must be one of "float" ("resource (closed)" given)', $resource];
         }
-        yield ['I expect float but got object UtilsTest', $this];
-        yield ['I expect float but got "text"', 'text'];
-        yield ['I expect float but got "text"', new class() {
+        yield ['must be one of "float" ("object UtilsTest" given)', $this];
+        yield ['must be one of "float" ("text" given)', 'text'];
+        yield ['must be one of "float" ("text" given)', new class() {
             public function __toString()
             {
                 return 'text';
@@ -172,9 +172,9 @@ class UtilsTest extends TestCase
         $resource = fopen(__FILE__, 'r');
         if ($resource !== false) {
             fclose($resource);
-            yield ['I expect string but got resource (closed)', $resource];
+            yield ['must be one of "string" ("resource (closed)" given)', $resource];
         }
-        yield ['I expect string but got array', []];
+        yield ['must be one of "string" ("array" given)', []];
     }
 
     /**
@@ -192,8 +192,8 @@ class UtilsTest extends TestCase
         $resource = fopen(__FILE__, 'r');
         if ($resource !== false) {
             fclose($resource);
-            yield ['I expect bool but got resource (closed)', $resource];
+            yield ['must be one of "bool" ("resource (closed)" given)', $resource];
         }
-        yield ['I expect bool but got array', []];
+        yield ['must be one of "bool" ("array" given)', []];
     }
 }

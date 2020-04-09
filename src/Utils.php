@@ -29,7 +29,7 @@ class Utils
                 $input = (string) $input;
             case 'string':
                 if (!preg_match('/^\s*[1-9][0-9]*(\.0+){0,1}\s*$/', $input)) {
-                    $displayValue = json_encode($input);
+                    $displayValue = $input;
                     break;
                 }
                 return (int) $input;
@@ -55,7 +55,7 @@ class Utils
                 $input = (string) $input;
             case 'string':
                 if (!preg_match('/^\s*[0-9]/', $input)) {
-                    $displayValue = json_encode($input);
+                    $displayValue = $input;
                     break;
                 }
                 return (float) $input;

@@ -1,9 +1,9 @@
 <?php
 
-
 namespace W2w\Lib\ApieObjectAccessNormalizer\Normalizers;
 
 use ReflectionClass;
+use stdClass;
 use Symfony\Component\PropertyInfo\Type;
 use Symfony\Component\Serializer\Exception\MissingConstructorArgumentsException;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
@@ -54,6 +54,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
 
     public function denormalize($data, $type, $format = null, array $context = [])
     {
+        if ($data instanceof stdClass) {
+            $data = json_decode(json_encode($data), true);
+        }
         $context = $this->sanitizeContext($context);
         if (empty($context['object_to_populate'])) {
             $object = $this->instantiate($data, $type, $context['object_access'], $format, $context);
@@ -80,9 +83,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
             }
             $succeeded = false;
             $foundErrors = [];
-            foreach ($objectAccess->getGetterTypes($reflClass, $denormalizedFieldName) as $type) {
+            foreach ($objectAccess->getSetterTypes($reflClass, $denormalizedFieldName) as $getterType) {
                 try {
-                    $result = $this->denormalizeType($data, $denormalizedFieldName, $type, $format, $context);
+                    $result = $this->denormalizeType($data, $denormalizedFieldName, $fieldName, $getterType, $format, $context);
                     $objectAccess->setValue($object, $denormalizedFieldName, $result);
                     $succeeded = true;
                 } catch (Throwable $throwable) {
@@ -108,28 +111,25 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         return $object;
     }
 
-    private function denormalizeType(array $data, string $key, Type $type, ?string $format = null, array $context = [])
+    private function denormalizeType(array $data, string $denormalizedFieldName, string $fieldName, Type $type, ?string $format = null, array $context = [])
     {
-        if (null === ($data[$key] ?? null) && $type->isNullable()) {
+        if (null === ($data[$fieldName] ?? null) && $type->isNullable()) {
             return null;
-        }
-        if (!array_key_exists($key, $data)) {
-            throw new MissingConstructorArgumentsException('required');
         }
         switch ($type->getBuiltinType()) {
             case Type::BUILTIN_TYPE_INT:
-                return Utils::toInt($data[$key]);
+                return Utils::toInt($data[$fieldName]);
             case Type::BUILTIN_TYPE_FLOAT:
-                return Utils::toFloat($data[$key]);
+                return Utils::toFloat($data[$fieldName]);
             case Type::BUILTIN_TYPE_STRING:
-                return Utils::toString($data[$key]);
+                return Utils::toString($data[$fieldName]);
             case Type::BUILTIN_TYPE_BOOL:
-                return Utils::toBool($data[$key]);
+                return Utils::toBool($data[$fieldName]);
             case Type::BUILTIN_TYPE_OBJECT:
                 $newContext = $context;
-                $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $key) : $key;
+                $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $denormalizedFieldName) : $denormalizedFieldName;
                 return $this->serializer->denormalize(
-                    $data[$key],
+                    $data[$fieldName],
                     $type->getClassName() ?? 'stdClass',
                     $format,
                     $newContext
@@ -138,15 +138,15 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 $subType = $type->getCollectionValueType();
                 if ($subType && $subType->getClassName()) {
                     $newContext = $context;
-                    $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $key) : $key;
+                    $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $denormalizedFieldName) : $denormalizedFieldName;
                     return $this->serializer->denormalize(
-                        $data[$key],
+                        $data[$fieldName],
                         $subType->getClassName() . '[]',
                         $format,
                         $newContext
                     );
                 }
-                return (array) $data[$key];
+                return (array) $data[$fieldName];
             default:
                 throw new CouldNotConvertException('int, float, string, bool, object, array', $type->getBuiltinType());
         }
@@ -154,18 +154,26 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
 
     private function instantiate(array $data, string $type, ObjectAccessInterface $objectAccess, ?string $format = null, array $context = [])
     {
-        $argumentTypes = $objectAccess->getConstructorArguments(new ReflectionClass($type));
+        $reflectionClass = new ReflectionClass($type);
+        $argumentTypes = $objectAccess->getConstructorArguments($reflectionClass);
         $errors = new ErrorBag($context['key_prefix']);
         $parsedArguments = [];
         foreach ($argumentTypes as $denormalizedFieldName => $argumentType) {
             try {
                 $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
-                if ($argumentType) {
-                    $parsedArguments[] = $this->denormalizeType($data, $fieldName, $argumentType, $format, $context);
-                } else {
-                    if (!array_key_exists($fieldName, $data)) {
-                        throw new MissingConstructorArgumentsException('required');
+                if (!array_key_exists($fieldName, $data)) {
+                    $constructor = $reflectionClass->getConstructor();
+                    foreach ($constructor->getParameters() as $parameter) {
+                        if ($parameter->name === $denormalizedFieldName && $parameter->isDefaultValueAvailable()) {
+                            $parsedArguments[] = $parameter->getDefaultValue();
+                            continue(2);
+                        }
                     }
+                    throw new MissingConstructorArgumentsException($fieldName . ' is required');
+                }
+                if ($argumentType) {
+                    $parsedArguments[] = $this->denormalizeType($data, $denormalizedFieldName, $fieldName, $argumentType, $format, $context);
+                } else {
                     $parsedArguments[] = $data[$fieldName];
 
                 }
@@ -183,7 +191,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
 
     public function supportsDenormalization($data, $type, $format = null)
     {
-        return is_array($data) && class_exists($type);
+        return (is_array($data) || $data instanceof stdClass) && class_exists($type);
     }
 
     public function normalize($object, $format = null, array $context = [])

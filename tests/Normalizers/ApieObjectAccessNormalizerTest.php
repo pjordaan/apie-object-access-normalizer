@@ -170,49 +170,49 @@ class ApieObjectAccessNormalizerTest extends TestCase
 
         // no typehints, but still required in constructor
         yield [
-            ['noTypehint' => ['required']],
+            ['noTypehint' => ['noTypehint is required']],
             [],
             ClassWithNoTypehints::class,
         ];
         // input type is wrong
         yield [
-            ['one' => ['I expect float but got "invalid"']],
+            ['one' => ['must be one of "float" ("invalid" given)']],
             ['one' => 'invalid', 'two' => 2],
             SumExample::class,
         ];
         // input type is wrong
         yield [
-            ['one' => ['I expect float but got NULL']],
+            ['one' => ['must be one of "float" ("NULL" given)']],
             ['one' => null, 'two' => 2],
             SumExample::class,
         ];
         // input type is wrong
         yield [
-            ['one' => ['I expect float but got array']],
+            ['one' => ['must be one of "float" ("array" given)']],
             ['one' => [2], 'two' => 2],
             SumExample::class,
         ];
         // constructor has typehint, but other properties do not
         yield [
-            ['input' => ['I expect string but got array']],
+            ['input' => ['must be one of "string" ("array" given)']],
             ['input' => ['this is an array']],
             ClassWithoutConstructorTypehint::class,
         ];
         // validation error in sub class
         yield [
-            ['subClass.input' => ['I expect string but got array']],
+            ['subClass.input' => ['must be one of "string" ("array" given)']],
             ['subClass' => ['input' => ['this is an array']]],
             ClassWithSubclass::class,
         ];
 
         //class with conflicting typehints still look at the constructor typehint
         yield [
-            ['boolean' => ['I expect float but got array']],
+            ['boolean' => ['must be one of "float" ("array" given)']],
             ['boolean' => []],
             ClassWithConflictingTypehints::class,
         ];
         yield [
-            ['boolean' => ['I expect float but got ""']],
+            ['boolean' => ['must be one of "float" ("" given)']],
             ['boolean' => ''],
             ClassWithConflictingTypehints::class,
         ];
@@ -221,7 +221,7 @@ class ApieObjectAccessNormalizerTest extends TestCase
         if ($handle !== false) {
             fclose($handle);
             yield [
-                ['boolean' => ['I expect float but got resource (closed)']],
+                ['boolean' => ['must be one of "float" ("resource (closed)" given)']],
                 ['boolean' => $handle],
                 ClassWithConflictingTypehints::class,
             ];
@@ -230,7 +230,7 @@ class ApieObjectAccessNormalizerTest extends TestCase
         // PHP 7.4 property typehint
         if (PHP_VERSION_ID >= 70400) {
             yield [
-                ['property' => ['I expect int but got array']],
+                ['property' => ['must be one of "int" ("array" given)']],
                 ['property' => []],
                 ClassWithPhp74PropertyTypehint::class,
             ];
