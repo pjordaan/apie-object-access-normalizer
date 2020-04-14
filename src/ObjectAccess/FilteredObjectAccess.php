@@ -90,4 +90,9 @@ class FilteredObjectAccess implements ObjectAccessInterface
     {
         return $this->objectAccess->instantiate($reflectionClass, $constructorArgs);
     }
+
+    public function getDescription(ReflectionClass $reflectionClass, string $fieldName, bool $preferGetters): ?string
+    {
+        return $this->objectAccess->getDescription($reflectionClass, $fieldName, $preferGetters);
+    }
 }

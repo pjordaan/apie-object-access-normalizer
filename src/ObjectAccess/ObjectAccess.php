@@ -179,6 +179,21 @@ class ObjectAccess implements ObjectAccessInterface
         return $this->buildTypes($res, $reflectionClass, $fieldName, 'getSetterMapping');
     }
 
+    /**
+     * Returns description of a field name.
+     *
+     * @TODO: make a difference between getters and setters
+     *
+     * @param ReflectionClass $reflectionClass
+     * @param string $fieldName
+     * @param bool $preferGetters
+     * @return string|null
+     */
+    public function getDescription(ReflectionClass $reflectionClass, string $fieldName, bool $preferGetters): ?string
+    {
+        return $this->phpDocExtractor->getShortDescription($reflectionClass->name, $fieldName);
+    }
+
     public function getSetterTypes(ReflectionClass $reflectionClass, string $fieldName): array
     {
         $mapping = $this->getSetterMapping($reflectionClass);
