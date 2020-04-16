@@ -4,6 +4,7 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 
 use ReflectionClass;
 use ReflectionMethod;
+use ReflectionParameter;
 use ReflectionProperty;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Type;
@@ -11,6 +12,7 @@ use Throwable;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectAccessException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectWriteException;
+use W2w\Lib\ApieObjectAccessNormalizer\TypeUtils;
 
 class ObjectAccess implements ObjectAccessInterface
 {
@@ -175,7 +177,7 @@ class ObjectAccess implements ObjectAccessInterface
         if (!isset($mapping[$fieldName])) {
             throw new NameNotFoundException($fieldName);
         }
-        $res = $this->convertToTypeArray($mapping[$fieldName]);
+        $res = TypeUtils::convertToTypeArray($mapping[$fieldName]);
         return $this->buildTypes($res, $reflectionClass, $fieldName, 'getSetterMapping');
     }
 
@@ -200,7 +202,7 @@ class ObjectAccess implements ObjectAccessInterface
         if (!isset($mapping[$fieldName])) {
             throw new NameNotFoundException($fieldName);
         }
-        $res = $this->convertToTypeArray($mapping[$fieldName]);
+        $res = TypeUtils::convertToTypeArray($mapping[$fieldName]);
         return $this->buildTypes($res, $reflectionClass, $fieldName, 'getGetterMapping');
     }
 
@@ -216,7 +218,7 @@ class ObjectAccess implements ObjectAccessInterface
             if (!isset($mapping[$fieldName])) {
                 return [];
             }
-            $res = $this->convertToTypeArray($mapping[$fieldName]);
+            $res = TypeUtils::convertToTypeArray($mapping[$fieldName]);
             return $this->buildTypes($res, $reflectionClass, $fieldName, null);
         }
         return $this->unique($types);
@@ -254,48 +256,6 @@ class ObjectAccess implements ObjectAccessInterface
             $data['value_type'] = $this->key($valueType, $recursion + 1);
         }
         return json_encode($data);
-    }
-
-    /**
-     * @param (ReflectionMethod|ReflectionProperty)[] $methods
-     * @return Type[]
-     */
-    private function convertToTypeArray(array $methods)
-    {
-        $res = [];
-        foreach ($methods as $method) {
-            if ($method instanceof ReflectionMethod) {
-                $parameters = $method->getParameters();
-                $parameter = reset($parameters);
-                $type = null;
-                if ($parameter && !$parameter->isOptional()) {
-                    $type = $parameter->getType();
-                } elseif (!$parameter) {
-                    $type = $method->getReturnType();
-                }
-                if (!$type) {
-                    continue;
-                }
-                if ($type->isBuiltin()) {
-                    $res[] = new Type($type->getName(), $type->allowsNull());
-                } else {
-                    $res[] = new Type(Type::BUILTIN_TYPE_OBJECT, $type->allowsNull(), $type->getName());
-                }
-            } elseif ($method instanceof ReflectionProperty) {
-                if (PHP_VERSION_ID >= 70400) {
-                    $type = $method->getType();
-                    if (!$type) {
-                        continue;
-                    }
-                    if ($type->isBuiltin()) {
-                        $res[] = new Type($type->getName(), $type->allowsNull());
-                    } else {
-                        $res[] = new Type(Type::BUILTIN_TYPE_OBJECT, $type->allowsNull(), $type->getName());
-                    }
-                }
-            }
-        }
-        return $res;
     }
 
     public function getValue(object $instance, string $fieldName)
@@ -363,32 +323,32 @@ class ObjectAccess implements ObjectAccessInterface
             $type = $parameter->getType();
             if ($type) {
                 if ($type->isBuiltin()) {
-                    $res[$parameter->getName()] = new Type($type->getName(), $type->allowsNull());
+                    $res[$parameter->name] = new Type($type->getName(), $type->allowsNull());
                 } else {
-                    $res[$parameter->getName()] = new Type(Type::BUILTIN_TYPE_OBJECT, $type->allowsNull(), $type->getName());
+                    $res[$parameter->name] = new Type(Type::BUILTIN_TYPE_OBJECT, $type->allowsNull(), $type->getName());
                 }
             } else {
-                $types = [];
-                if (isset($this->getGetterMapping($reflectionClass)[$parameter->getName()])) {
-                    $types = array_merge(
-                        $types,
-                        $this->getGetterTypes($reflectionClass, $parameter->getName())
-                    );
-                }
-                if (isset($this->getSetterMapping($reflectionClass)[$parameter->getName()])) {
-                    $types = array_merge(
-                        $types,
-                        $this->getSetterTypes($reflectionClass, $parameter->getName())
-                    );
-                }
-                if (empty($types)) {
-                    $res[$parameter->getName()] = null;
-                } else {
-                    $res[$parameter->getName()] = reset($types);
-                }
+                $res[$parameter->name] = $this->guessType($reflectionClass, $parameter);
             }
         }
         return $res;
+    }
+
+    private function guessType(ReflectionClass $reflectionClass, ReflectionParameter $parameter): ?Type
+    {
+        $types = $this->getGetterMapping($reflectionClass)[$parameter->name] ?? [];
+        $res = [];
+        if (empty($types)) {
+            $types = $this->getSetterMapping($reflectionClass)[$parameter->name] ?? [];
+            if (empty($types)) {
+                return null;
+            } else {
+                $res = $this->getSetterTypes($reflectionClass, $parameter->name);
+            }
+        } else {
+            $res = $this->getGetterTypes($reflectionClass, $parameter->name);
+        }
+        return reset($res) ? : null;
     }
 
     public function instantiate(ReflectionClass $reflectionClass, array $constructorArgs): object
