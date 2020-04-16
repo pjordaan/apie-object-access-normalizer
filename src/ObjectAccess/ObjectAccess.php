@@ -73,7 +73,7 @@ class ObjectAccess implements ObjectAccessInterface
 
         $reflectionMethods = $reflectionClass->getMethods($this->methodFlags);
         foreach ($reflectionMethods as $method) {
-            if (!$this->isGetMethod($method)) {
+            if (!TypeUtils::isGetMethod($method)) {
                 continue;
             }
 
@@ -105,7 +105,7 @@ class ObjectAccess implements ObjectAccessInterface
 
         $reflectionMethods = $reflectionClass->getMethods($this->methodFlags);
         foreach ($reflectionMethods as $method) {
-            if (!$this->isSetMethod($method)) {
+            if (!TypeUtils::isSetMethod($method)) {
                 continue;
             }
 
@@ -132,38 +132,6 @@ class ObjectAccess implements ObjectAccessInterface
     public function getSetterFields(ReflectionClass $reflectionClass): array
     {
         return array_keys($this->getSetterMapping($reflectionClass));
-    }
-
-    /**
-     * Checks if a method's name is get.* or is.*, and can be called without parameters.
-     */
-    protected function isGetMethod(\ReflectionMethod $method): bool
-    {
-        $methodLength = \strlen($method->name);
-
-        return
-            !$method->isStatic() &&
-            (
-                ((0 === strpos($method->name, 'get') && 3 < $methodLength) ||
-                    (0 === strpos($method->name, 'is') && 2 < $methodLength) ||
-                    (0 === strpos($method->name, 'has') && 3 < $methodLength)) &&
-                0 === $method->getNumberOfRequiredParameters()
-            );
-    }
-
-    /**
-     * Checks if a method's name is set.*  with 0 or 1 parameters.
-     */
-    protected function isSetMethod(\ReflectionMethod $method): bool
-    {
-        $methodLength = strlen($method->name);
-
-        return
-            !$method->isStatic() &&
-            (
-                (0 === strpos($method->name, 'set') && 3 < $methodLength)
-                && 2 > $method->getNumberOfRequiredParameters()
-            );
     }
 
     /**

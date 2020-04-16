@@ -32,6 +32,12 @@ class TypeUtils
         return $res;
     }
 
+    /**
+     * Check if the method is a getter or setter and returns a typehint if available.
+     *
+     * @param ReflectionMethod $property
+     * @return Type|null
+     */
     public static function convertMethodToType(ReflectionMethod $method): ?Type
     {
         $parameters = $method->getParameters();
@@ -52,6 +58,8 @@ class TypeUtils
     }
 
     /**
+     * If PHP version is higher than 7.4 return typehint of property.
+     *
      * @param ReflectionProperty $property
      * @return Type|null
      */
@@ -68,5 +76,37 @@ class TypeUtils
             return new Type(Type::BUILTIN_TYPE_OBJECT, $type->allowsNull(), $type->getName());
         }
         return null;
+    }
+
+    /**
+     * Checks if a method's name is get.* or is.*, and can be called without parameters.
+     */
+    public static function isGetMethod(ReflectionMethod $method): bool
+    {
+        $methodLength = strlen($method->name);
+
+        return
+            !$method->isStatic() &&
+            (
+                ((0 === strpos($method->name, 'get') && 3 < $methodLength) ||
+                    (0 === strpos($method->name, 'is') && 2 < $methodLength) ||
+                    (0 === strpos($method->name, 'has') && 3 < $methodLength)) &&
+                0 === $method->getNumberOfRequiredParameters()
+            );
+    }
+
+    /**
+     * Checks if a method's name is set.*  with 0 or 1 parameters.
+     */
+    public static function isSetMethod(ReflectionMethod $method): bool
+    {
+        $methodLength = strlen($method->name);
+
+        return
+            !$method->isStatic() &&
+            (
+                (0 === strpos($method->name, 'set') && 3 < $methodLength)
+                && 2 > $method->getNumberOfRequiredParameters()
+            );
     }
 }
