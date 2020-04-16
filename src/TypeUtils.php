@@ -83,16 +83,10 @@ class TypeUtils
      */
     public static function isGetMethod(ReflectionMethod $method): bool
     {
-        $methodLength = strlen($method->name);
-
         return
-            !$method->isStatic() &&
-            (
-                ((0 === strpos($method->name, 'get') && 3 < $methodLength) ||
-                    (0 === strpos($method->name, 'is') && 2 < $methodLength) ||
-                    (0 === strpos($method->name, 'has') && 3 < $methodLength)) &&
-                0 === $method->getNumberOfRequiredParameters()
-            );
+            !$method->isStatic()
+            && preg_match('/^(get|is|has)[A-Z0-9]/i', $method->name)
+            && 0 === $method->getNumberOfRequiredParameters();
     }
 
     /**
@@ -100,13 +94,9 @@ class TypeUtils
      */
     public static function isSetMethod(ReflectionMethod $method): bool
     {
-        $methodLength = strlen($method->name);
-
         return
-            !$method->isStatic() &&
-            (
-                (0 === strpos($method->name, 'set') && 3 < $methodLength)
-                && 2 > $method->getNumberOfRequiredParameters()
-            );
+            !$method->isStatic()
+            && preg_match('/^set[A-Z0-9]/i', $method->name)
+            && 2 > $method->getNumberOfRequiredParameters();
     }
 }
