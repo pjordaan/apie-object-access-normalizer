@@ -8,6 +8,9 @@ use ReflectionClass;
 use Symfony\Component\PropertyInfo\Type;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
 
+/**
+ * Decorator around an Object Access to filter the properties that are accessible.
+ */
 class FilteredObjectAccess implements ObjectAccessInterface
 {
     /**
@@ -29,6 +32,9 @@ class FilteredObjectAccess implements ObjectAccessInterface
         $this->filteredFields = array_combine($filteredFields, $filteredFields);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getGetterFields(ReflectionClass $reflectionClass): array
     {
         $result = $this->objectAccess->getGetterFields($reflectionClass);
@@ -37,6 +43,9 @@ class FilteredObjectAccess implements ObjectAccessInterface
         }));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getSetterFields(ReflectionClass $reflectionClass): array
     {
         $result = $this->objectAccess->getSetterFields($reflectionClass);
@@ -45,6 +54,10 @@ class FilteredObjectAccess implements ObjectAccessInterface
         }));
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function getGetterTypes(ReflectionClass $reflectionClass, string $fieldName): array
     {
         if (!isset($this->filteredFields[$fieldName])) {
@@ -53,6 +66,10 @@ class FilteredObjectAccess implements ObjectAccessInterface
         return $this->objectAccess->getGetterTypes($reflectionClass, $fieldName);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function getSetterTypes(ReflectionClass $reflectionClass, string $fieldName): array
     {
         if (!isset($this->filteredFields[$fieldName])) {
@@ -61,15 +78,19 @@ class FilteredObjectAccess implements ObjectAccessInterface
         return $this->objectAccess->getSetterTypes($reflectionClass, $fieldName);
     }
 
+
     /**
-     * @param ReflectionClass $reflectionClass
-     * @return Type[]
+     * {@inheritDoc}
      */
     public function getConstructorArguments(ReflectionClass $reflectionClass): array
     {
         return $this->objectAccess->getConstructorArguments($reflectionClass);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function getValue(object $instance, string $fieldName)
     {
         if (!isset($this->filteredFields[$fieldName])) {
@@ -78,6 +99,10 @@ class FilteredObjectAccess implements ObjectAccessInterface
         return $this->objectAccess->getValue($instance, $fieldName);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function setValue(object $instance, string $fieldName, $value)
     {
         if (!isset($this->filteredFields[$fieldName])) {
@@ -86,11 +111,19 @@ class FilteredObjectAccess implements ObjectAccessInterface
         return $this->objectAccess->setValue($instance, $fieldName, $value);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function instantiate(ReflectionClass $reflectionClass, array $constructorArgs): object
     {
         return $this->objectAccess->instantiate($reflectionClass, $constructorArgs);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
     public function getDescription(ReflectionClass $reflectionClass, string $fieldName, bool $preferGetters): ?string
     {
         return $this->objectAccess->getDescription($reflectionClass, $fieldName, $preferGetters);

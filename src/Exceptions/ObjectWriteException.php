@@ -6,6 +6,9 @@ use ReflectionMethod;
 use ReflectionProperty;
 use Throwable;
 
+/**
+ * Exception thrown when a value could not be set.
+ */
 class ObjectWriteException extends ApieException
 {
     /**

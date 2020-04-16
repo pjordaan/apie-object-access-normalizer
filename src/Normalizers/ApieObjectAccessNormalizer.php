@@ -23,6 +23,9 @@ use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccess;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
 use W2w\Lib\ApieObjectAccessNormalizer\Utils;
 
+/**
+ * Normalizes any classes to arrays and viceversa using a class implementing ObjectAccessInterface.
+ */
 class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInterface, SerializerAwareInterface
 {
     use SerializerAwareTrait;
@@ -52,11 +55,16 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         $this->classMetadataFactory = $classMetadataFactory;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function denormalize($data, $type, $format = null, array $context = [])
     {
         if ($data instanceof stdClass) {
             $data = json_decode(json_encode($data), true);
         }
+
+        // initialize context.
         $context = $this->sanitizeContext($context);
         if (empty($context['object_to_populate'])) {
             $object = $this->instantiate($data, $type, $context['object_access'], $format, $context);
@@ -71,18 +79,22 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         $reflClass = new ReflectionClass($object);
         $setterFields = $objectAccess->getSetterFields($reflClass);
         $errors = new ErrorBag($context['key_prefix']);
+        // iterate over all fields that can be set and try to call them.
         foreach ($setterFields as $denormalizedFieldName) {
             try {
                 $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
             } catch (Throwable $throwable) {
+                // this means the actual field name can not be normalized, so is this a validation error or an internal error?
                 $errors->addThrowable($denormalizedFieldName, $throwable);
                 continue;
             }
+            // actual field does not exist in the $data, so we do not need to call it.
             if (!array_key_exists($fieldName, $data)) {
                 continue;
             }
             $succeeded = false;
             $foundErrors = [];
+            // try all setters and see if we can call it.
             foreach ($objectAccess->getSetterTypes($reflClass, $denormalizedFieldName) as $getterType) {
                 try {
                     $result = $this->denormalizeType($data, $denormalizedFieldName, $fieldName, $getterType, $format, $context);
@@ -96,6 +108,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 if ($foundErrors) {
                     $errors->addThrowable($denormalizedFieldName, reset($foundErrors));
                 } else {
+                    // if no typehints exist we end up here.
                     try {
                         $objectAccess->setValue($object, $denormalizedFieldName, $data[$fieldName]);
                     } catch (Throwable $throwable) {
@@ -111,6 +124,17 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         return $object;
     }
 
+    /**
+     * Try to convert a field value to the wanted Type.
+     *
+     * @param array $data
+     * @param string $denormalizedFieldName
+     * @param string $fieldName
+     * @param Type $type
+     * @param string|null $format
+     * @param array $context
+     * @return array|bool|float|int|string|null
+     */
     private function denormalizeType(array $data, string $denormalizedFieldName, string $fieldName, Type $type, ?string $format = null, array $context = [])
     {
         if (null === ($data[$fieldName] ?? null) && $type->isNullable()) {
@@ -152,6 +176,16 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         }
     }
 
+    /**
+     * Try to get create a new instance of this class from the input $data we retrieve.
+     *
+     * @param array $data
+     * @param string $type
+     * @param ObjectAccessInterface $objectAccess
+     * @param string|null $format
+     * @param array $context
+     * @return object
+     */
     private function instantiate(array $data, string $type, ObjectAccessInterface $objectAccess, ?string $format = null, array $context = [])
     {
         $reflectionClass = new ReflectionClass($type);
@@ -185,15 +219,20 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         if (!empty($errors)) {
             throw new ValidationException($errors);
         }
-        $reflClass = new ReflectionClass($type);
-        return $objectAccess->instantiate($reflClass, $parsedArguments);
+        return $objectAccess->instantiate($reflectionClass, $parsedArguments);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function supportsDenormalization($data, $type, $format = null)
     {
         return (is_array($data) || $data instanceof stdClass) && class_exists($type);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function normalize($object, $format = null, array $context = [])
     {
         $context = $this->sanitizeContext($context);
@@ -211,6 +250,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         return $result;
     }
 
+    /**
+     * Adds FilteredObjectAccess decorator around the Object Access by reading the class metadata needed for the serializer.
+     */
     private function filterObjectAccess(ObjectAccessInterface $objectAccess, string $className, array $groups): ObjectAccessInterface
     {
         $allowedAttributes = [];
@@ -225,7 +267,16 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         return new FilteredObjectAccess($objectAccess, $allowedAttributes);
     }
 
-    private function toPrimitive($input, string $fieldName, ?string $format = null, array $context)
+    /**
+     * Try to convert any object or array to a native php type by calling the serializer again.
+     *
+     * @param $input
+     * @param string $fieldName
+     * @param string|null $format
+     * @param array $context
+     * @return array
+     */
+    private function toPrimitive($input, string $fieldName, ?string $format = null, array $context = [])
     {
         if (is_array($input)) {
             $result = [];
@@ -246,11 +297,20 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         return $input;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function supportsNormalization($data, $format = null)
     {
         return is_object($data);
     }
 
+    /**
+     * Adds default context array values if they are missing.
+     *
+     * @param array $context
+     * @return array
+     */
     private function sanitizeContext(array $context): array
     {
         if (empty($context['object_access'])) {

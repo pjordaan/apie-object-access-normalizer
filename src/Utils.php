@@ -7,6 +7,12 @@ use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\CouldNotConvertException;
 
 class Utils
 {
+    /**
+     * Converts any value to int if possible.
+     *
+     * @param $input
+     * @return int
+     */
     public static function toInt($input): int
     {
         $displayValue = gettype($input);
@@ -37,6 +43,12 @@ class Utils
         throw new CouldNotConvertException('int', $displayValue);
     }
 
+    /**
+     * Converts any value to float if possible.
+     *
+     * @param mixed $input
+     * @return float
+     */
     public static function toFloat($input): float
     {
         $displayValue = gettype($input);
@@ -63,6 +75,12 @@ class Utils
         throw new CouldNotConvertException('float', $displayValue);
     }
 
+    /**
+     * Converts any value to string if possible.
+     *
+     * @param mixed $input
+     * @return string
+     */
     public static function toString($input): string
     {
         $displayValue = gettype($input);
@@ -77,6 +95,12 @@ class Utils
         throw new CouldNotConvertException('string', $displayValue);
     }
 
+    /**
+     * Converts any value to bool if possible.
+     *
+     * @param mixed $input
+     * @return bool
+     */
     public static function toBool($input): bool
     {
         $displayValue = gettype($input);

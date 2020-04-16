@@ -6,6 +6,9 @@ use ReflectionMethod;
 use ReflectionProperty;
 use Throwable;
 
+/**
+ * Exception thrown when trying to get a property value.
+ */
 class ObjectAccessException extends ApieException
 {
     /**

@@ -1,9 +1,10 @@
 <?php
-namespace W2w\Lib\ApieObjectAccessNormalizer\Errors;
+namespace W2w\Test\ApieObjectAccessNormalizer\Errors;
 
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase1\ValidationException as ValidationExceptionCase1;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase2\ValidationException as ValidationExceptionCase2;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase3\ValidationException as ValidationExceptionCase3;

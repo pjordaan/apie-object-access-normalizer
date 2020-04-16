@@ -14,16 +14,34 @@ use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectAccessException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectWriteException;
 use W2w\Lib\ApieObjectAccessNormalizer\TypeUtils;
 
+/**
+ * Class that informs about object access and able to access instances of the object in setting/getting values.
+ */
 class ObjectAccess implements ObjectAccessInterface
 {
+    /**
+     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     */
     private $getterCache = [];
 
+    /**
+     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     */
     private $setterCache = [];
 
+    /**
+     * @var PhpDocExtractor
+     */
     private $phpDocExtractor;
 
+    /**
+     * @var int
+     */
     private $methodFlags;
 
+    /**
+     * @var int
+     */
     private $propertyFlags;
 
     public function __construct(bool $publicOnly = true)
@@ -37,6 +55,15 @@ class ObjectAccess implements ObjectAccessInterface
         $this->phpDocExtractor = new PhpDocExtractor();
     }
 
+    /**
+     * Sort Reflection properties and methods in order of priority which is:
+     * - getXXX method
+     * - isXXX method
+     * - hasXXX method
+     * - public property
+     *
+     * @param array $options
+     */
     private function sort(array& $options)
     {
         usort($options, function ($a, $b) {
@@ -62,6 +89,12 @@ class ObjectAccess implements ObjectAccessInterface
         });
     }
 
+    /**
+     * Returns all methods and properties of a class to retrieve a value.
+     *
+     * @param ReflectionClass $reflectionClass
+     * @return (ReflectionMethod|ReflectionProperty)[][][]
+     */
     protected function getGetterMapping(ReflectionClass $reflectionClass): array
     {
         $className= $reflectionClass->getName();
@@ -94,6 +127,12 @@ class ObjectAccess implements ObjectAccessInterface
         return $this->getterCache[$className] = $attributes;
     }
 
+    /**
+     * Returns all methods and properties of a class that can set a value.
+     *
+     * @param ReflectionClass $reflectionClass
+     * @return (ReflectionMethod|ReflectionProperty)[][][]
+     */
     protected function getSetterMapping(ReflectionClass $reflectionClass): array
     {
         $className= $reflectionClass->getName();
@@ -124,20 +163,24 @@ class ObjectAccess implements ObjectAccessInterface
         return $this->setterCache[$className] = $attributes;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getGetterFields(ReflectionClass $reflectionClass): array
     {
         return array_keys($this->getGetterMapping($reflectionClass));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getSetterFields(ReflectionClass $reflectionClass): array
     {
         return array_keys($this->getSetterMapping($reflectionClass));
     }
 
     /**
-     * @param ReflectionClass $reflectionClass
-     * @param string $fieldName
-     * @return Type[]
+     * {@inheritDoc}
      */
     public function getGetterTypes(ReflectionClass $reflectionClass, string $fieldName): array
     {
@@ -150,20 +193,16 @@ class ObjectAccess implements ObjectAccessInterface
     }
 
     /**
-     * Returns description of a field name.
-     *
-     * @TODO: make a difference between getters and setters
-     *
-     * @param ReflectionClass $reflectionClass
-     * @param string $fieldName
-     * @param bool $preferGetters
-     * @return string|null
+     * {@inheritDoc}
      */
     public function getDescription(ReflectionClass $reflectionClass, string $fieldName, bool $preferGetters): ?string
     {
         return $this->phpDocExtractor->getShortDescription($reflectionClass->name, $fieldName);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getSetterTypes(ReflectionClass $reflectionClass, string $fieldName): array
     {
         $mapping = $this->getSetterMapping($reflectionClass);
@@ -174,6 +213,15 @@ class ObjectAccess implements ObjectAccessInterface
         return $this->buildTypes($res, $reflectionClass, $fieldName, 'getGetterMapping');
     }
 
+    /**
+     * Sanitize array of Types
+     *
+     * @param Type[] $types
+     * @param ReflectionClass $reflectionClass
+     * @param string $fieldName
+     * @param string|null $methodOnEmptyResult
+     * @return Type[]
+     */
     private function buildTypes(array $types, ReflectionClass $reflectionClass, string $fieldName, ?string $methodOnEmptyResult)
     {
         $phpDocTypes = $this->phpDocExtractor->getTypes($reflectionClass->getName(), $fieldName) ?? [];
@@ -207,6 +255,13 @@ class ObjectAccess implements ObjectAccessInterface
         return array_values($res);
     }
 
+    /**
+     * Returns a cache key.
+     *
+     * @param Type $type
+     * @param int $recursion
+     * @return string
+     */
     private function key(Type $type, int $recursion = 0): string
     {
         $data = [
@@ -226,6 +281,9 @@ class ObjectAccess implements ObjectAccessInterface
         return json_encode($data);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getValue(object $instance, string $fieldName)
     {
         $mapping = $this->getGetterMapping(new ReflectionClass($instance));
@@ -251,6 +309,9 @@ class ObjectAccess implements ObjectAccessInterface
         throw $error ?? new NameNotFoundException($fieldName);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function setValue(object $instance, string $fieldName, $value)
     {
         $mapping = $this->getSetterMapping(new ReflectionClass($instance));
@@ -280,6 +341,9 @@ class ObjectAccess implements ObjectAccessInterface
         throw $error ?? new NameNotFoundException($fieldName);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getConstructorArguments(ReflectionClass $reflectionClass): array
     {
         $constructor = $reflectionClass->getConstructor();
@@ -302,6 +366,14 @@ class ObjectAccess implements ObjectAccessInterface
         return $res;
     }
 
+
+    /**
+     * Guess the typehint of a constructor argument if it is missing in the constructor.
+     *
+     * @param ReflectionClass $reflectionClass
+     * @param ReflectionParameter $parameter
+     * @return Type|null
+     */
     private function guessType(ReflectionClass $reflectionClass, ReflectionParameter $parameter): ?Type
     {
         $types = $this->getGetterMapping($reflectionClass)[$parameter->name] ?? [];
@@ -319,6 +391,9 @@ class ObjectAccess implements ObjectAccessInterface
         return reset($res) ? : null;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function instantiate(ReflectionClass $reflectionClass, array $constructorArgs): object
     {
         return $reflectionClass->newInstanceArgs($constructorArgs);
