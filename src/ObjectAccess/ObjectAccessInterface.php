@@ -63,7 +63,7 @@ interface ObjectAccessInterface
      *
      * @param object $instance
      * @param string $fieldName
-     * @param $value
+     * @param mixed $value
      * @return mixed
      */
     public function setValue(object $instance, string $fieldName, $value);

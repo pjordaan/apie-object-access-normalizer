@@ -44,7 +44,12 @@ class ObjectAccess implements ObjectAccessInterface
      */
     private $propertyFlags;
 
-    public function __construct(bool $publicOnly = true)
+    /**
+     * @var bool
+     */
+    private $disabledConstructor ;
+
+    public function __construct(bool $publicOnly = true, bool $disabledConstructor = false)
     {
         $this->methodFlags = $publicOnly
             ? ReflectionMethod::IS_PUBLIC
@@ -52,6 +57,7 @@ class ObjectAccess implements ObjectAccessInterface
         $this->propertyFlags = $publicOnly
             ? ReflectionProperty::IS_PUBLIC
             : (ReflectionProperty::IS_PUBLIC|ReflectionProperty::IS_PROTECTED|ReflectionProperty::IS_PRIVATE);
+        $this->disabledConstructor = $disabledConstructor;
         $this->phpDocExtractor = new PhpDocExtractor();
     }
 
@@ -396,6 +402,9 @@ class ObjectAccess implements ObjectAccessInterface
      */
     public function instantiate(ReflectionClass $reflectionClass, array $constructorArgs): object
     {
+        if ($this->disabledConstructor) {
+            return $reflectionClass->newInstanceWithoutConstructor();
+        }
         return $reflectionClass->newInstanceArgs($constructorArgs);
     }
 }
