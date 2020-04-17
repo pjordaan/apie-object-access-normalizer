@@ -93,6 +93,28 @@ class CachedObjectAccessTest extends TestCase
         $this->assertEquals($expected, $this->testItem->getConstructorArguments(new ReflectionClass(SumExample::class)));
     }
 
+    public function testIsSupported()
+    {
+        $expected = true;
+        $cacheKey = str_replace('\\', '|', 'isSupported,' . SumExample::class);
+        $this->assertEquals($expected, $this->testItem->isSupported(new ReflectionClass(SumExample::class)));
+        $cacheItem = $this->cache->getItem($cacheKey);
+        $this->assertTrue($cacheItem->isHit(), 'cachekey "' . $cacheKey . '" not found, got ' . $this->getCacheItems());
+        $this->assertEquals($expected, $this->cache->getItem($cacheKey)->get());
+        $this->assertEquals($expected, $this->testItem->isSupported(new ReflectionClass(SumExample::class)));
+    }
+
+    public function testGetDescription()
+    {
+        $expected = 'First number';
+        $cacheKey = str_replace('\\', '|', 'getDescription,' . SumExample::class . ',one,true');
+        $this->assertEquals($expected, $this->testItem->getDescription(new ReflectionClass(SumExample::class), 'one', true));
+        $cacheItem = $this->cache->getItem($cacheKey);
+        $this->assertTrue($cacheItem->isHit(), 'cachekey "' . $cacheKey . '" not found, got ' . $this->getCacheItems());
+        $this->assertEquals($expected, $this->cache->getItem($cacheKey)->get());
+        $this->assertEquals($expected, $this->testItem->getDescription(new ReflectionClass(SumExample::class), 'one', true));
+    }
+
     public function testStandardPassthruMethods()
     {
         $actual = $this->testItem->instantiate(new ReflectionClass(SumExample::class), [1, '2']);
