@@ -14,6 +14,7 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Serializer\SerializerAwareInterface;
 use Symfony\Component\Serializer\SerializerAwareTrait;
 use Throwable;
+use Traversable;
 use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\CouldNotConvertException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
@@ -302,7 +303,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
      */
     public function supportsNormalization($data, $format = null)
     {
-        return is_object($data);
+        return is_object($data) && !$data instanceof Traversable;
     }
 
     /**
