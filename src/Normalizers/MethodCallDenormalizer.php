@@ -5,8 +5,10 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\Normalizers;
 
 use ReflectionClass;
 use ReflectionMethod;
+use stdClass;
 use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 use Symfony\Component\Serializer\Normalizer\ContextAwareDenormalizerInterface;
+use W2w\Lib\Apie\Exceptions\ValidationException;
 use W2w\Lib\ApieObjectAccessNormalizer\NameConverters\NullNameConverter;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
 
@@ -62,6 +64,9 @@ class MethodCallDenormalizer implements ContextAwareDenormalizerInterface
      */
     public function denormalize($data, $type, $format = null, array $context = [])
     {
+        if ($data instanceof stdClass) {
+            $data = json_decode(json_encode($data), true);
+        }
         if (!isset($context['key_prefix'])) {
             $context['key_prefix'] = '';
         }
@@ -70,12 +75,15 @@ class MethodCallDenormalizer implements ContextAwareDenormalizerInterface
         $arguments = $objectAccess->getMethodArguments($method, new ReflectionClass($context['object-instance']));
         $initialArguments = $context['initial-arguments'] ?? [];
         $returnObject = $initialArguments;
-        foreach ($arguments as $denormalizedFieldName => $type) {
+        foreach ($arguments as $denormalizedFieldName => $typeHint) {
             $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
             if (isset($initialArguments[$fieldName])) {
                 continue;
             }
-            $returnObject[$fieldName] = $this->normalizer->denormalizeType($data, $denormalizedFieldName, $fieldName, $type, $format, $context);
+            if (!isset($data[$fieldName])) {
+                throw new ValidationException([$denormalizedFieldName => ['required']]);
+            }
+            $returnObject[$fieldName] = $this->normalizer->denormalizeType($data, $denormalizedFieldName, $fieldName, $typeHint, $format, $context);
         }
         return $method->invokeArgs($context['object-instance'], $returnObject);
     }
