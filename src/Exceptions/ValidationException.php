@@ -3,6 +3,7 @@
 namespace W2w\Lib\ApieObjectAccessNormalizer\Exceptions;
 
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
 use W2w\Lib\ApieObjectAccessNormalizer\Normalizers\ApieObjectAccessNormalizer;
 
 /**
@@ -15,12 +16,19 @@ class ValidationException extends ApieException
     private $errors;
 
     /**
-     * @param string[][] $errors
+     * @param string[][]|ErrorBag $errors
      * @param Throwable|null $previous
      */
-    public function __construct(array $errors, Throwable $previous = null)
+    public function __construct($errors, Throwable $previous = null)
     {
-        $this->errors = $errors;
+        $this->errors = $errors instanceof ErrorBag ? $errors->getErrors() : (array) $errors;
+        if (!$previous && $errors instanceof ErrorBag && $errors->hasErrors()) {
+            $tmp = $errors->getExceptions();
+            $tmp = reset($tmp);
+            if ($tmp) {
+                $previous = reset($tmp) ? : null;
+            }
+        }
         parent::__construct(422, 'A validation error occurred', $previous);
     }
 

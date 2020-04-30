@@ -3,6 +3,7 @@
 namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 
 use ReflectionClass;
+use ReflectionMethod;
 use Symfony\Component\PropertyInfo\Type;
 
 interface ObjectAccessInterface
@@ -48,6 +49,15 @@ interface ObjectAccessInterface
      * @return Type[]
      */
     public function getConstructorArguments(ReflectionClass $reflectionClass): array;
+
+    /**
+     * Returns all types to call a method.
+     *
+     * @param ReflectionMethod $method
+     * @param ReflectionClass|null $reflectionClass
+     * @return Type[]
+     */
+    public function getMethodArguments(ReflectionMethod $method, ?ReflectionClass $reflectionClass = null): array;
 
     /**
      * Gets a property value.

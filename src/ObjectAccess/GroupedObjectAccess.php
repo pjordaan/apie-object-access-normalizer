@@ -4,6 +4,8 @@
 namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 
 use ReflectionClass;
+use ReflectionMethod;
+use Symfony\Component\PropertyInfo\Type;
 
 class GroupedObjectAccess implements ObjectAccessSupportedInterface
 {
@@ -131,5 +133,13 @@ class GroupedObjectAccess implements ObjectAccessSupportedInterface
             return $instance->isSupported($reflectionClass);
         }
         return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getMethodArguments(ReflectionMethod $method, ?ReflectionClass $reflectionClass = null): array
+    {
+        return $this->findObjectAccessForClass($reflectionClass)->getMethodArguments($method, $reflectionClass);
     }
 }

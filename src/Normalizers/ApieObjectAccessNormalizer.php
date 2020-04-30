@@ -118,8 +118,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 }
             }
         }
-        $errors = $errors->getErrors();
-        if (!empty($errors)) {
+        if ($errors->hasErrors()) {
             throw new ValidationException($errors);
         }
         return $object;
@@ -127,6 +126,8 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
 
     /**
      * Try to convert a field value to the wanted Type.
+     *
+     * @internal
      *
      * @param array $data
      * @param string $denormalizedFieldName
@@ -136,7 +137,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
      * @param array $context
      * @return array|bool|float|int|string|null
      */
-    private function denormalizeType(array $data, string $denormalizedFieldName, string $fieldName, Type $type, ?string $format = null, array $context = [])
+    public function denormalizeType(array $data, string $denormalizedFieldName, string $fieldName, Type $type, ?string $format = null, array $context = [])
     {
         if (null === ($data[$fieldName] ?? null) && $type->isNullable()) {
             return null;
@@ -216,8 +217,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 $errors->addThrowable($denormalizedFieldName, $throwable);
             }
         }
-        $errors = $errors->getErrors();
-        if (!empty($errors)) {
+        if ($errors->hasErrors()) {
             throw new ValidationException($errors);
         }
         return $objectAccess->instantiate($reflectionClass, $parsedArguments);
@@ -316,6 +316,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
     {
         if (empty($context['object_access'])) {
             $context['object_access'] = $this->objectAccess;
+        }
+        if (empty($context['child_object_groups'])) {
+            $context['child_object_groups'] = [];
         }
         if (empty($context['key_prefix'])) {
             $context['key_prefix'] = '';

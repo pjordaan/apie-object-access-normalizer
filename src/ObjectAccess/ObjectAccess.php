@@ -6,6 +6,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionParameter;
 use ReflectionProperty;
+use ReflectionType;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Type;
 use Throwable;
@@ -356,8 +357,19 @@ class ObjectAccess implements ObjectAccessInterface
         if (!$constructor) {
             return [];
         }
+        return $this->getMethodArguments($constructor, $reflectionClass);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getMethodArguments(ReflectionMethod $method, ?ReflectionClass $reflectionClass = null): array
+    {
+        if (!$reflectionClass) {
+            $reflectionClass = $method->getDeclaringClass();
+        }
         $res = [];
-        foreach ($constructor->getParameters() as $parameter) {
+        foreach ($method->getParameters() as $parameter) {
             $type = $parameter->getType();
             if ($type) {
                 if ($type->isBuiltin()) {

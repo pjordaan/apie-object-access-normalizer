@@ -3,8 +3,8 @@
 
 namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 
-
 use ReflectionClass;
+use ReflectionMethod;
 use Symfony\Component\PropertyInfo\Type;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
 
@@ -127,5 +127,13 @@ class FilteredObjectAccess implements ObjectAccessInterface
     public function getDescription(ReflectionClass $reflectionClass, string $fieldName, bool $preferGetters): ?string
     {
         return $this->objectAccess->getDescription($reflectionClass, $fieldName, $preferGetters);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getMethodArguments(ReflectionMethod $method, ?ReflectionClass $reflectionClass = null): array
+    {
+        return $this->getMethodArguments($method, $reflectionClass);
     }
 }

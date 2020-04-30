@@ -6,6 +6,8 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 use Closure;
 use Psr\Cache\CacheItemPoolInterface;
 use ReflectionClass;
+use ReflectionMethod;
+use Symfony\Component\PropertyInfo\Type;
 
 class CachedObjectAccess implements ObjectAccessSupportedInterface
 {
@@ -154,6 +156,22 @@ class CachedObjectAccess implements ObjectAccessSupportedInterface
                 }
                 return true;
             },
+            $reflectionClass
+        );
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getMethodArguments(ReflectionMethod $method, ?ReflectionClass $reflectionClass = null): array
+    {
+        return $this->cacheCheck(
+            __FUNCTION__ . ',' . $method->name . ',' . ($reflectionClass ? $reflectionClass->name : '(null)'),
+            function (ReflectionMethod $method, ?ReflectionClass $reflectionClass = null) {
+                return $this->internal->getMethodArguments($method, $reflectionClass);
+            },
+            $method,
             $reflectionClass
         );
     }

@@ -79,11 +79,19 @@ class ErrorBag
      * Since ApieObjectAccessNormalizer catches all exceptions for debugging reasons we keep a record of the exceptions
      * too.
      *
-     * @return array
+     * @return Throwable[][]
      */
     public function getExceptions(): array
     {
         return $this->exceptions;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasErrors(): bool
+    {
+        return !empty($this->errors);
     }
 
     /**
