@@ -8,7 +8,9 @@ use ReflectionMethod;
 use stdClass;
 use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 use Symfony\Component\Serializer\Normalizer\ContextAwareDenormalizerInterface;
-use W2w\Lib\Apie\Exceptions\ValidationException;
+use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
+use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
 use W2w\Lib\ApieObjectAccessNormalizer\NameConverters\NullNameConverter;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
 
@@ -75,15 +77,26 @@ class MethodCallDenormalizer implements ContextAwareDenormalizerInterface
         $arguments = $objectAccess->getMethodArguments($method, new ReflectionClass($context['object-instance']));
         $initialArguments = $context['initial-arguments'] ?? [];
         $returnObject = $initialArguments;
+        $errorBag = new ErrorBag('');
         foreach ($arguments as $denormalizedFieldName => $typeHint) {
             $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $type, $format, $context);
             if (isset($initialArguments[$fieldName])) {
                 continue;
             }
             if (!isset($data[$fieldName])) {
-                throw new ValidationException([$denormalizedFieldName => ['required']]);
+                $errorBag->addThrowable($denormalizedFieldName, new ValidationException([$denormalizedFieldName => ['required']]));
+                continue;
             }
-            $returnObject[$fieldName] = $this->normalizer->denormalizeType($data, $denormalizedFieldName, $fieldName, $typeHint, $format, $context);
+            try {
+                $returnObject[$fieldName] = $this->normalizer->denormalizeType(
+                    $data, $denormalizedFieldName, $fieldName, $typeHint, $format, $context
+                );
+            } catch (Throwable $throwable) {
+                $errorBag->addThrowable($denormalizedFieldName, $throwable);
+            }
+        }
+        if ($errorBag->hasErrors()) {
+            throw new ValidationException($errorBag);
         }
         return $method->invokeArgs($context['object-instance'], $returnObject);
     }
