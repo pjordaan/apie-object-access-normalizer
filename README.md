@@ -91,7 +91,7 @@ use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccess;
 $serializer = new Serializer(
     [
         new DateTimeNormalizer(),
-        new ApieObjectAccessNormalizer(new ObjectAccess(), new CamelCaseToSnakeCaseNameConverter),
+        new ApieObjectAccessNormalizer(new ObjectAccess(), new CamelCaseToSnakeCaseNameConverter()),
         new ArrayDenormalizer(),
     ],
     [new JsonEncoder()]
@@ -100,6 +100,41 @@ $instance = new Example(12);
 // returns array['number' => 12, 'string_value' => '<no value set>']
 var_dump($serializer->serialize($instance, 'json'));
 ```
+
+### Advanced usages
+In many cases you wan to use ObjectAccess and only use a different ObjectAccessInterface implementation
+for a specific class or interface. For that we created GroupedObjectAccess.
+
+```php
+<?php
+
+use Illuminate\Database\Eloquent\Model;
+use W2w\Laravel\LaravelApie\ObjectAccess\EloquentModelAccess;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\GroupedObjectAccess;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccess;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\SelfObjectAccess;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\SelfObjectAccessInterface;
+
+$objectAccess = new GroupedObjectAccess(
+    new ObjectAccess,
+    [
+        // For SomeClass we can read private properties/getters
+        SomeClass::class => new ObjectAccess(false, true),
+        // for any class that implements SelfobjectAccessInterface we use SelfObjectAccess
+        SelfObjectAccessInterface::class => new SelfObjectAccess(),
+        // does not exist in this package, just an example. Eloquent models are notorious for the amount of magic.
+        Model::class => new EloquentModelObjectAccess(), 
+]
+    
+);
+```
+
+## Available object access implementations
+- CachedObjectAccess: decorator to cache the results for performance reasons.
+- FilteredObjectAccess: Filter the fields you can actually use. Another decorator
+- GroupedObjectAccess: see Advanced usages. Can be used to use different Object Acces instances dependening on the class
+- ObjectAccess: Default object access. Checks public properties and public setters and getters.
+- SelfObjectAccess: Works for classes that implementSelfObjectAccessInterface, so the class can tell itself what it can access.
 
 ### in Symfony framework
 If you want to use it in the Symfony framework all you need to do is register class
