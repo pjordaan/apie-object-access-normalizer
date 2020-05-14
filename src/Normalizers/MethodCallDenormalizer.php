@@ -84,7 +84,7 @@ class MethodCallDenormalizer implements ContextAwareDenormalizerInterface
                 continue;
             }
             if (!isset($data[$fieldName])) {
-                $errorBag->addThrowable($denormalizedFieldName, new ValidationException([$denormalizedFieldName => ['required']]));
+                $errorBag->addThrowable($fieldName, new ValidationException([$fieldName => ['required']]));
                 continue;
             }
             try {
@@ -92,7 +92,7 @@ class MethodCallDenormalizer implements ContextAwareDenormalizerInterface
                     $data, $denormalizedFieldName, $fieldName, $typeHint, $format, $context
                 );
             } catch (Throwable $throwable) {
-                $errorBag->addThrowable($denormalizedFieldName, $throwable);
+                $errorBag->addThrowable($fieldName, $throwable);
             }
         }
         if ($errorBag->hasErrors()) {
