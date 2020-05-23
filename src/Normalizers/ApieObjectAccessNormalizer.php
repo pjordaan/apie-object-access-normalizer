@@ -72,6 +72,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         } else {
             $object = $context['object_to_populate'];
         }
+        $context['object_hierarchy'][] = $object;
         /** @var ObjectAccessInterface $objectAccess */
         $objectAccess = $context['object_access'];
         if ($this->classMetadataFactory && isset($context['groups'])) {
@@ -153,7 +154,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 return Utils::toBool($data[$fieldName]);
             case Type::BUILTIN_TYPE_OBJECT:
                 $newContext = $context;
+                unset($newContext['object_to_populate']);
                 $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $denormalizedFieldName) : $denormalizedFieldName;
+                $newContext['collection_resource'] = $type->getCollectionValueType() ? $type->getCollectionValueType()->getClassName() : null;
                 return $this->serializer->denormalize(
                     $data[$fieldName],
                     $type->getClassName() ?? 'stdClass',
@@ -164,7 +167,9 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
                 $subType = $type->getCollectionValueType();
                 if ($subType && $subType->getClassName()) {
                     $newContext = $context;
+                    unset($newContext['object_to_populate']);
                     $newContext['key_prefix'] = $context['key_prefix'] ? ($context['key_prefix'] . '.' . $denormalizedFieldName) : $denormalizedFieldName;
+                    $newContext['collection_resource'] = $type->getCollectionValueType() ? $type->getCollectionValueType()->getClassName() : null;
                     return $this->serializer->denormalize(
                         $data[$fieldName],
                         $subType->getClassName() . '[]',
