@@ -251,7 +251,12 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         $result = [];
         foreach ($objectAccess->getGetterFields($reflectionClass) as $denormalizedFieldName) {
             $fieldName = $this->nameConverter->normalize($denormalizedFieldName, $reflectionClass->name, $format, $context);
-            $result[$fieldName] = $this->toPrimitive($objectAccess->getValue($object, $denormalizedFieldName), $fieldName, $format, $context);
+            $value  = $objectAccess->getValue($object, $denormalizedFieldName);
+            // circular reference
+            if (is_object($value) && in_array($value, $context['object_hierarchy'], true)) {
+                continue;
+            }
+            $result[$fieldName] = $this->toPrimitive($value, $fieldName, $format, $context);
         }
         return $result;
     }
@@ -288,6 +293,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
             $result = [];
             foreach ($input as $key => $item) {
                 $newContext = $context;
+                unset($newContext['object_to_populate']);
                 $newContext['object_hierarchy'][] = $input;
                 $newContext['key_prefix'] .= '.' . $fieldName . '.' . $key;
                 $result[$key] = $this->toPrimitive($item, $key, $format, $newContext);
@@ -296,6 +302,7 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         }
         if (is_object($input)) {
             $newContext = $context;
+            unset($newContext['object_to_populate']);
             $newContext['object_hierarchy'][] = $input;
             $newContext['key_prefix'] .= '.' . $fieldName;
             return $this->serializer->normalize($input, $format, $newContext);
