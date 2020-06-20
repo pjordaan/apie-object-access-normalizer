@@ -49,7 +49,11 @@ class ErrorBag
             $expectedPrefix = $prefix . '.';
             foreach ($validationErrors as $key => $validationError) {
                 if ($key !== $prefix && strpos($key, $expectedPrefix) !== 0) {
-                    $key = $expectedPrefix . $key;
+                    if ($key === '') {
+                        $key = $prefix;
+                    } else {
+                        $key = $expectedPrefix . $key;
+                    }
                 }
                 if (!is_array($validationError)) {
                     $validationError = [$validationError];
