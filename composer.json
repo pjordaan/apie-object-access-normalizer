@@ -3,7 +3,7 @@
   "description": "Symfony normalizers used internally by Apie",
   "require": {
     "php": "^7.2",
-    "phpdocumentor/reflection-docblock": "^4.3",
+    "phpdocumentor/reflection-docblock": "^4.3|5.*",
     "symfony/http-kernel": "^4.3|^5.0",
     "symfony/property-info": "^4.3|^5.0",
     "symfony/serializer": "^4.3|^5.0",
