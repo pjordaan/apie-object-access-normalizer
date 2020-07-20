@@ -16,6 +16,11 @@ class ValidationException extends ApieException implements LocalizationableExcep
     private $errors;
 
     /**
+     * @var Throwable[][] | null
+     */
+    private $exceptions;
+
+    /**
      * @param string[][]|ErrorBag $errors
      * @param Throwable|null $previous
      */
@@ -23,8 +28,8 @@ class ValidationException extends ApieException implements LocalizationableExcep
     {
         $this->errors = $errors instanceof ErrorBag ? $errors->getErrors() : (array) $errors;
         if (!$previous && $errors instanceof ErrorBag && $errors->hasErrors()) {
-            $tmp = $errors->getExceptions();
-            $tmp = reset($tmp);
+            $this->exceptions = $errors->getExceptions();
+            $tmp = reset($this->exceptions);
             if ($tmp) {
                 $previous = reset($tmp) ? : null;
             }
@@ -40,6 +45,14 @@ class ValidationException extends ApieException implements LocalizationableExcep
     public function getErrors(): array
     {
         return $this->errors;
+    }
+
+    /**
+     * @return Throwable[][]|null
+     */
+    public function getExceptions(): ?array
+    {
+        return $this->exceptions;
     }
 
     public function getI18n(): LocalizationInfo
