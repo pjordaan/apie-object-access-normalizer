@@ -9,8 +9,13 @@ use Throwable;
 /**
  * Exception thrown when trying to get a property value.
  */
-class ObjectAccessException extends ApieException
+class ObjectAccessException extends ApieException implements LocalizationableException
 {
+    /**
+     * @var string
+     */
+    private $name;
+
     /**
      * @param ReflectionMethod|ReflectionProperty $method
      * @param string $fieldName
@@ -21,7 +26,19 @@ class ObjectAccessException extends ApieException
         string $fieldName,
         Throwable $previous
     ) {
-        $message = 'Could not access property "' . $fieldName . '" from ' . $method->getName() . ': ' . $previous->getMessage();
+        $this->name = $method->getName();
+        $message = 'Could not access property "' . $fieldName . '" from ' . $this->name . ': ' . $previous->getMessage();
         parent::__construct(500, $message, $previous);
+    }
+
+    public function getI18n(): LocalizationInfo
+    {
+        return new LocalizationInfo(
+            'serialize.read',
+            [
+                'name' => $this->name,
+                'previous' => $this->getPrevious()->getMessage(),
+            ]
+        );
     }
 }

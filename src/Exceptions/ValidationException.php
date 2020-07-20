@@ -11,7 +11,7 @@ use W2w\Lib\ApieObjectAccessNormalizer\Normalizers\ApieObjectAccessNormalizer;
  *
  * @see ApieObjectAccessNormalizer::denormalize()
  */
-class ValidationException extends ApieException
+class ValidationException extends ApieException implements LocalizationableException
 {
     private $errors;
 
@@ -40,5 +40,10 @@ class ValidationException extends ApieException
     public function getErrors(): array
     {
         return $this->errors;
+    }
+
+    public function getI18n(): LocalizationInfo
+    {
+        return new LocalizationInfo('general.validation', ['errors' => $this->getErrors()]);
     }
 }

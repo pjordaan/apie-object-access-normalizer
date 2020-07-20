@@ -9,8 +9,13 @@ use Throwable;
 /**
  * Exception thrown when a value could not be set.
  */
-class ObjectWriteException extends ApieException
+class ObjectWriteException extends ApieException implements LocalizationableException
 {
+    /**
+     * @var string
+     */
+    private $name;
+
     /**
      * @param ReflectionMethod|ReflectionProperty $method
      * @param string $fieldName
@@ -21,7 +26,19 @@ class ObjectWriteException extends ApieException
         string $fieldName,
         Throwable $previous
     ) {
-        $message = 'Could not write property "' . $fieldName . '" with ' . $method->getName() . ': ' . $previous->getMessage();
+        $this->name = $method->getName();
+        $message = 'Could not write property "' . $fieldName . '" with ' . $this->name . ': ' . $previous->getMessage();
         parent::__construct(500, $message, $previous);
+    }
+
+    public function getI18n(): LocalizationInfo
+    {
+        return new LocalizationInfo(
+            'serialize.write',
+            [
+                'name' => $this->name,
+                'previous' => $this->getPrevious()->getMessage(),
+            ]
+        );
     }
 }
