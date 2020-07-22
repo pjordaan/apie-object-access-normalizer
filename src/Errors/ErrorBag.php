@@ -3,8 +3,11 @@
 
 namespace W2w\Lib\ApieObjectAccessNormalizer\Errors;
 
+use Closure;
 use ReflectionClass;
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ErrorBagAwareException;
+use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\LocalizationableException;
 use W2w\Lib\ApieObjectAccessNormalizer\Normalizers\ApieObjectAccessNormalizer;
 
 /**
@@ -21,18 +24,41 @@ class ErrorBag
     private $prefix;
 
     /**
-     * @var string[][]
+     * @var ErrorBagField[][]
      */
     private $errors = [];
-
-    /**
-     * @var Throwable[][]
-     */
-    private $exceptions = [];
 
     public function __construct(string $prefix)
     {
         $this->prefix = $prefix;
+    }
+
+    /**
+     * @param array $index
+     * @param string $prefix
+     * @return ErrorBag
+     */
+    public static function fromArray(array $index, string $prefix = ''): ErrorBag
+    {
+        $result = new ErrorBag($prefix);
+        foreach ($index as $key => $errors) {
+            if (!is_array($errors)) {
+                $errors = [$errors];
+            }
+            foreach ($errors as $error) {
+                $result->errors[$key][] = new ErrorBagField($error);
+            }
+        }
+        return $result;
+    }
+
+    public function merge(ErrorBag $otherBag)
+    {
+        foreach ($otherBag->errors as $prefix => $errors) {
+            foreach ($errors as $error) {
+                $this->errors[$prefix][] = $error;
+            }
+        }
     }
 
     /**
@@ -45,6 +71,10 @@ class ErrorBag
     public function addThrowable(string $fieldName, Throwable $throwable)
     {
         $prefix = $this->prefix ? ($this->prefix . '.' . $fieldName) : $fieldName;
+        if ($throwable instanceof ErrorBagAwareException) {
+            $this->merge($throwable->getErrorBag());
+            return;
+        }
         if ($validationErrors = $this->extractValidationErrors($throwable)) {
             $expectedPrefix = $prefix . '.';
             foreach ($validationErrors as $key => $validationError) {
@@ -59,24 +89,37 @@ class ErrorBag
                     $validationError = [$validationError];
                 }
                 foreach ($validationError as $error) {
-                    $this->errors[$key][] = $error;
-                    $this->exceptions[$key][] = $throwable;
+                    $this->errors[$key][] = new ErrorBagField($error, null, $throwable);
                 }
             }
             return;
         }
-        $this->errors[$prefix][] = $throwable->getMessage();
-        $this->exceptions[$prefix][] = $throwable;
+        $this->errors[$prefix][] = new ErrorBagField(
+            $throwable->getMessage(),
+            $throwable instanceof LocalizationableException ? $throwable->getI18n() : null,
+            $throwable
+        );
     }
 
     /**
      * Returns a list of error messages.
      *
+     * @param Closure|null $callback
      * @return string[][]
      */
-    public function getErrors(): array
+    public function getErrors(?Closure $callback = null): array
     {
-        return $this->errors;
+        if (!$callback) {
+            $callback = function (ErrorBagField $field) {
+                return $field->getMessage();
+            };
+        }
+        return array_map(
+            function (array $errors) use (&$callback) {
+                return array_map($callback, $errors);
+            },
+            $this->errors
+        );
     }
 
     /**
@@ -87,7 +130,17 @@ class ErrorBag
      */
     public function getExceptions(): array
     {
-        return $this->exceptions;
+        return array_map(
+            function (array $errors) {
+                return array_filter(array_map(
+                    function (ErrorBagField $field) {
+                        return $field->getSource();
+                    },
+                    $errors
+                ));
+            },
+            $this->errors
+        );
     }
 
     /**
