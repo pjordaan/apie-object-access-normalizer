@@ -78,7 +78,7 @@ class ErrorBag
         if ($validationErrors = $this->extractValidationErrors($throwable)) {
             $expectedPrefix = $prefix . '.';
             foreach ($validationErrors as $key => $validationError) {
-                if ($key !== $prefix && strpos($key, $expectedPrefix) !== 0) {
+                if (('' . $key) !== $prefix && strpos($key, $expectedPrefix) !== 0) {
                     if ($key === '') {
                         $key = $prefix;
                     } else {
