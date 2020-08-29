@@ -52,7 +52,7 @@ class ErrorBag
         return $result;
     }
 
-    public function merge(ErrorBag $otherBag)
+    private function merge(ErrorBag $otherBag)
     {
         foreach ($otherBag->errors as $prefix => $errors) {
             foreach ($errors as $error) {

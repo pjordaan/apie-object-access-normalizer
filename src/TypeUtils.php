@@ -6,27 +6,22 @@ namespace W2w\Lib\ApieObjectAccessNormalizer;
 use ReflectionMethod;
 use ReflectionProperty;
 use Symfony\Component\PropertyInfo\Type;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\GetterInterface;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\SetterInterface;
 
 class TypeUtils
 {
     /**
-     * @param (ReflectionMethod|ReflectionProperty)[] $methods
+     * @param GetterInterface[]|SetterInterface[] $methods
      * @return Type[]
      */
     public static function convertToTypeArray(array $methods)
     {
         $res = [];
         foreach ($methods as $method) {
-            if ($method instanceof ReflectionMethod) {
-                $type = self::convertMethodToType($method);
-                if ($type) {
-                    $res[] = $type;
-                }
-            } elseif ($method instanceof ReflectionProperty) {
-                $type = self::convertPropertyToType($method);
-                if ($type) {
-                    $res[] = $type;
-                }
+            $type = $method->toType();
+            if ($type) {
+                $res[] = $type;
             }
         }
         return $res;

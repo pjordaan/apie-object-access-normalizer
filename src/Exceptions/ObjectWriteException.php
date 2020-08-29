@@ -5,6 +5,7 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\Exceptions;
 use ReflectionMethod;
 use ReflectionProperty;
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\SetterInterface;
 
 /**
  * Exception thrown when a value could not be set.
@@ -17,12 +18,12 @@ class ObjectWriteException extends ApieException implements LocalizationableExce
     private $name;
 
     /**
-     * @param ReflectionMethod|ReflectionProperty $method
+     * @param SetterInterface $method
      * @param string $fieldName
      * @param Throwable $previous
      */
     public function __construct(
-        $method,
+        SetterInterface $method,
         string $fieldName,
         Throwable $previous
     ) {

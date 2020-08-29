@@ -4,8 +4,8 @@ namespace W2w\Test\ApieObjectAccessNormalizer\Errors;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Throwable;
-use W2w\Lib\Apie\Exceptions\ValidationException;
 use W2w\Lib\ApieObjectAccessNormalizer\Errors\ErrorBag;
+use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase1\ValidationException as ValidationExceptionCase1;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase2\ValidationException as ValidationExceptionCase2;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\TestCase3\ValidationException as ValidationExceptionCase3;
@@ -146,10 +146,10 @@ class ErrorBagTest extends TestCase
         $exception = new ValidationException(['' => ['no key']]);
         yield [
             [
-                'field' => ['no key'],
+                '' => ['no key'],
             ],
             [
-                'field' => [$exception],
+                '' => [],
             ],
             '',
             'field',
@@ -158,10 +158,10 @@ class ErrorBagTest extends TestCase
 
         yield [
             [
-                'prefix.field' => ['no key'],
+                '' => ['no key'],
             ],
             [
-                'prefix.field' => [$exception],
+                '' => [],
             ],
             'prefix',
             'field',
