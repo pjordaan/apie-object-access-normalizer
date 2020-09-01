@@ -135,6 +135,30 @@ $objectAccess = new GroupedObjectAccess(
 - GroupedObjectAccess: see Advanced usages. Can be used to use different Object Acces instances dependening on the class
 - ObjectAccess: Default object access. Checks public properties and public setters and getters.
 - SelfObjectAccess: Works for classes that implementSelfObjectAccessInterface, so the class can tell itself what it can access.
+- LocalizationAwareObjectAccess: Can be used on objects with localization aware fields. 
+
+### Localization
+Since version 2 we add localization support.
+In your simple object add a setter like this and you have a localized field:
+```php
+<?php
+namespace Wrwr;
+class ObjectWithLocalization
+{
+    private $pizzas = [];
+
+    public function setPizza(string $locale, string $preference) 
+    {
+        $this->pizzas[$locale] = $preference;
+    }
+    
+    public function getPizza(string $locale)
+    {
+        return $this->pizzas[$locale];
+    }
+}
+```
+This will result in a setter and getter for field name 'pizza' with support of localization.
 
 ### in Symfony framework
 If you want to use it in the Symfony framework all you need to do is register class

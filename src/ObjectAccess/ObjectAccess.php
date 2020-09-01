@@ -10,9 +10,17 @@ use ReflectionType;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Type;
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\CouldNotConvertException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectAccessException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectWriteException;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\GetterInterface;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\ReflectionMethodGetter;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\ReflectionPropertyGetter;
+use W2w\Lib\ApieObjectAccessNormalizer\Interfaces\PriorityAwareInterface;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\ReflectionMethodSetter;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\ReflectionPropertySetter;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\SetterInterface;
 use W2w\Lib\ApieObjectAccessNormalizer\TypeUtils;
 
 /**
@@ -21,12 +29,12 @@ use W2w\Lib\ApieObjectAccessNormalizer\TypeUtils;
 class ObjectAccess implements ObjectAccessInterface
 {
     /**
-     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     * @var GetterInterface[][][]
      */
     private $getterCache = [];
 
     /**
-     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     * @var SetterInterface[][][]
      */
     private $setterCache = [];
 
@@ -63,44 +71,34 @@ class ObjectAccess implements ObjectAccessInterface
     }
 
     /**
-     * Sort Reflection properties and methods in order of priority which is:
-     * - getXXX method
-     * - isXXX method
-     * - hasXXX method
-     * - public property
+     * Sort getters and setters on priority.
      *
-     * @param array $options
+     * @param PriorityAwareInterface[]& $options
      */
-    private function sort(array& $options)
+    protected function sort(array& $options)
     {
-        usort($options, function ($a, $b) {
-            if ($a instanceof ReflectionProperty) {
-                return 1;
-            }
-            if ($b instanceof ReflectionProperty) {
-                return -1;
-            }
-            /** @var ReflectionMethod $a */
-            /** @var ReflectionMethod $b */
-            // prio: get, is, has:
-            if (strpos($a->getName(), 'get') === 0) {
-                return -1;
-            }
-            if (strpos($b->getName(), 'get') === 0) {
-                return 1;
-            }
-            if (strpos($a->getName(), 'is') === 0) {
-                return -1;
-            }
-            return 1;
+        usort($options, function (PriorityAwareInterface $a, PriorityAwareInterface $b) {
+            return $b->getPriority() <=> $a->getPriority();
         });
+    }
+
+    /**
+     * Added in a method so it can be reused without exposing private property $methodFlags
+     * This returns all methods of a class.
+     *
+     * @param ReflectionClass $reflectionClass
+     * @return ReflectionMethod[]
+     */
+    final protected function getAvailableMethods(ReflectionClass $reflectionClass)
+    {
+        return $reflectionClass->getMethods($this->methodFlags);
     }
 
     /**
      * Returns all methods and properties of a class to retrieve a value.
      *
      * @param ReflectionClass $reflectionClass
-     * @return (ReflectionMethod|ReflectionProperty)[][][]
+     * @return GetterInterface[][]
      */
     protected function getGetterMapping(ReflectionClass $reflectionClass): array
     {
@@ -111,7 +109,7 @@ class ObjectAccess implements ObjectAccessInterface
 
         $attributes = [];
 
-        $reflectionMethods = $reflectionClass->getMethods($this->methodFlags);
+        $reflectionMethods = $this->getAvailableMethods($reflectionClass);
         foreach ($reflectionMethods as $method) {
             if (!TypeUtils::isGetMethod($method)) {
                 continue;
@@ -119,13 +117,13 @@ class ObjectAccess implements ObjectAccessInterface
 
             $attributeName = lcfirst(substr($method->name, 0 === strpos($method->name, 'is') ? 2 : 3));
             $method->setAccessible(true);
-            $attributes[$attributeName][] = $method;
+            $attributes[$attributeName][] = new ReflectionMethodGetter($method);
         }
         $reflectionProperties = $reflectionClass->getProperties($this->propertyFlags);
         foreach ($reflectionProperties as $property) {
             $attributeName = $property->getName();
             $property->setAccessible(true);
-            $attributes[$attributeName][] = $property;
+            $attributes[$attributeName][] = new ReflectionPropertyGetter($property);
         }
         foreach ($attributes as &$methods) {
             $this->sort($methods);
@@ -138,7 +136,7 @@ class ObjectAccess implements ObjectAccessInterface
      * Returns all methods and properties of a class that can set a value.
      *
      * @param ReflectionClass $reflectionClass
-     * @return (ReflectionMethod|ReflectionProperty)[][][]
+     * @return SetterInterface[][]
      */
     protected function getSetterMapping(ReflectionClass $reflectionClass): array
     {
@@ -149,7 +147,7 @@ class ObjectAccess implements ObjectAccessInterface
 
         $attributes = [];
 
-        $reflectionMethods = $reflectionClass->getMethods($this->methodFlags);
+        $reflectionMethods = $this->getAvailableMethods($reflectionClass);
         foreach ($reflectionMethods as $method) {
             if (!TypeUtils::isSetMethod($method)) {
                 continue;
@@ -157,14 +155,14 @@ class ObjectAccess implements ObjectAccessInterface
 
             $attributeName = lcfirst(substr($method->name, 3));
             $method->setAccessible(true);
-            $attributes[$attributeName][] = $method;
+            $attributes[$attributeName][] = new ReflectionMethodSetter($method);
         }
 
         $reflectionProperties = $reflectionClass->getProperties($this->propertyFlags);
         foreach ($reflectionProperties as $property) {
             $attributeName = $property->getName();
             $property->setAccessible(true);
-            $attributes[$attributeName][] = $property;
+            $attributes[$attributeName][] = new ReflectionPropertySetter($property);
         }
 
         return $this->setterCache[$className] = $attributes;
@@ -299,18 +297,11 @@ class ObjectAccess implements ObjectAccessInterface
         }
         $error = null;
         foreach ($mapping[$fieldName] as $option) {
-            if ($option instanceof ReflectionMethod) {
-                try {
-                    return $option->invoke($instance);
-                } catch (Throwable $throwable) {
-                    $error = new ObjectAccessException($option, $fieldName, $throwable);
-                }
-            }
-            if ($option instanceof ReflectionProperty) {
-                if ($error) {
-                    throw $error;
-                }
+            try {
                 return $option->getValue($instance);
+            } catch (Throwable $throwable) {
+                $error = new ObjectAccessException($option, $fieldName, $throwable);
+                throw $error;
             }
         }
         throw $error ?? new NameNotFoundException($fieldName);
@@ -327,22 +318,11 @@ class ObjectAccess implements ObjectAccessInterface
         }
         $error = null;
         foreach ($mapping[$fieldName] as $option) {
-            if ($option instanceof ReflectionMethod) {
-                try {
-                    return $option->invoke($instance, $value);
-                } catch (Throwable $throwable) {
-                    $error = new ObjectWriteException($option, $fieldName, $throwable);
-                }
-            }
-            if ($option instanceof ReflectionProperty) {
-                if ($error) {
-                    throw $error;
-                }
-                try {
-                    return $option->setValue($instance, $value);
-                } catch (Throwable $throwable) {
-                    $error = new ObjectWriteException($option, $fieldName, $throwable);
-                }
+            try {
+                return $option->setValue($instance, $value);
+            } catch (Throwable $throwable) {
+                $error = new ObjectWriteException($option, $fieldName, $throwable);
+                throw $error;
             }
         }
         throw $error ?? new NameNotFoundException($fieldName);

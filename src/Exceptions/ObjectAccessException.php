@@ -5,6 +5,7 @@ namespace W2w\Lib\ApieObjectAccessNormalizer\Exceptions;
 use ReflectionMethod;
 use ReflectionProperty;
 use Throwable;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\GetterInterface;
 
 /**
  * Exception thrown when trying to get a property value.
@@ -17,12 +18,12 @@ class ObjectAccessException extends ApieException implements LocalizationableExc
     private $name;
 
     /**
-     * @param ReflectionMethod|ReflectionProperty $method
+     * @param GetterInterface $method
      * @param string $fieldName
      * @param Throwable $previous
      */
     public function __construct(
-        $method,
+        GetterInterface $method,
         string $fieldName,
         Throwable $previous
     ) {

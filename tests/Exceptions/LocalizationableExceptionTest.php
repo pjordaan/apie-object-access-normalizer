@@ -12,6 +12,8 @@ use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectAccessException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ObjectWriteException;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\ReflectionMethodGetter;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\ReflectionMethodSetter;
 
 class LocalizationableExceptionTest extends TestCase
 {
@@ -34,7 +36,7 @@ class LocalizationableExceptionTest extends TestCase
     public function testObjectAccessError()
     {
         $testItem = new ObjectAccessException(
-            new ReflectionMethod(__METHOD__),
+            new ReflectionMethodGetter(new ReflectionMethod(__METHOD__)),
             'access',
             new RuntimeException('Internal error')
         );
@@ -46,7 +48,7 @@ class LocalizationableExceptionTest extends TestCase
     public function testObjectWriteError()
     {
         $testItem = new ObjectWriteException(
-            new ReflectionMethod(__METHOD__),
+            new ReflectionMethodSetter(new ReflectionMethod(__METHOD__)),
             'access',
             new RuntimeException('Internal error')
         );
