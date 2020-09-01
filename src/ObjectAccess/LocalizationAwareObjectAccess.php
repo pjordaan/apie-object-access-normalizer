@@ -3,25 +3,22 @@
 
 namespace W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess;
 
-
 use ReflectionClass;
-use ReflectionMethod;
-use ReflectionProperty;
-use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
-use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\CouldNotConvertException;
+use W2w\Lib\ApieObjectAccessNormalizer\Getters\GetterInterface;
 use W2w\Lib\ApieObjectAccessNormalizer\Getters\ReflectionLocalizedGetterMethod;
 use W2w\Lib\ApieObjectAccessNormalizer\Interfaces\LocalizationAwareInterface;
 use W2w\Lib\ApieObjectAccessNormalizer\Setters\ReflectionLocalizedSetterMethod;
+use W2w\Lib\ApieObjectAccessNormalizer\Setters\SetterInterface;
 
 class LocalizationAwareObjectAccess extends ObjectAccess
 {
     /**
-     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     * @var GetterInterface[][][]
      */
     private $getterCache = [];
 
     /**
-     * @var (ReflectionMethod|ReflectionProperty)[][][]
+     * @var SetterInterface[][][]
      */
     private $setterCache = [];
 
@@ -56,8 +53,8 @@ class LocalizationAwareObjectAccess extends ObjectAccess
             if ($method->getNumberOfRequiredParameters() === 1
                 && !$method->isStatic()
                 && preg_match('/^(get|has|is)[A-Z0-9]/i', $method->name)) {
-                $fieldName = substr($method->name, 4);
-                $attributes[$fieldName] = new ReflectionLocalizedGetterMethod(
+                $fieldName = lcfirst(substr($method->name, 0 === strpos($method->name, 'is') ? 2 : 3));
+                $attributes[$fieldName][] = new ReflectionLocalizedGetterMethod(
                     $method,
                     $this->localizationAware,
                     $this->conversionFn
@@ -86,8 +83,8 @@ class LocalizationAwareObjectAccess extends ObjectAccess
             if ($method->getNumberOfRequiredParameters() === 2
                 && !$method->isStatic()
                 && preg_match('/^(set)[A-Z0-9]/i', $method->name)) {
-                $fieldName = substr($method->name, 4);
-                $attributes[$fieldName] = new ReflectionLocalizedSetterMethod(
+                $fieldName = lcfirst(substr($method->name, 3));
+                $attributes[$fieldName][] = new ReflectionLocalizedSetterMethod(
                     $method,
                     $this->localizationAware,
                     $this->conversionFn
@@ -95,22 +92,6 @@ class LocalizationAwareObjectAccess extends ObjectAccess
             }
         }
 
-        return $this->getterCache[$className] = $attributes;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function handleAlternateSetter(string $fieldName, $option, $value)
-    {
-        throw new CouldNotConvertException('ReflectionMethod|ReflectionProperty', get_class($option));
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function handleAlternateGetter(string $fieldName, $option)
-    {
-        throw new CouldNotConvertException('ReflectionMethod|ReflectionProperty', get_class($option));
+        return $this->setterCache[$className] = $attributes;
     }
 }
