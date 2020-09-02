@@ -70,8 +70,10 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
         if (empty($context['object_to_populate'])) {
             $object = $this->instantiate($data, $type, $context['object_access'], $format, $context);
             // skip setters that were already set in the constructor (and allows a different type then the setter)
-            foreach (array_keys($context['object_access']->getConstructorArguments(new ReflectionClass($type))) as $skippedField) {
-                unset($data[$skippedField]);
+            if (empty('keep_setter_calls')) {
+                foreach (array_keys($context['object_access']->getConstructorArguments(new ReflectionClass($type))) as $skippedField) {
+                    unset($data[$skippedField]);
+                }
             }
         } else {
             $object = $context['object_to_populate'];
