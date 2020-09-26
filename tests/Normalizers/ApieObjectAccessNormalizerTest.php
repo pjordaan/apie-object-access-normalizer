@@ -20,6 +20,7 @@ use W2w\Lib\Apie\Plugins\ValueObject\Normalizers\ValueObjectNormalizer;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\ValidationException;
 use W2w\Lib\ApieObjectAccessNormalizer\Normalizers\ApieObjectAccessNormalizer;
 use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\ObjectAccessInterface;
+use W2w\Lib\ApieObjectAccessNormalizer\ObjectAccess\PolymorphicRelationObjectAccess;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithConflictingTypehints;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithMultipleTypes;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithNoTypehints;
@@ -31,6 +32,10 @@ use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithSubclass;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithTypedArrayTypehint;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\ClassWithValueObject;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\FullRestObject;
+use W2w\Test\ApieObjectAccessNormalizer\Mocks\Polymorphic\BaseClass;
+use W2w\Test\ApieObjectAccessNormalizer\Mocks\Polymorphic\MutablePizza;
+use W2w\Test\ApieObjectAccessNormalizer\Mocks\Polymorphic\SalamiPizza;
+use W2w\Test\ApieObjectAccessNormalizer\Mocks\Polymorphic\ValueObjectPizza;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\RecursiveObject;
 use W2w\Test\ApieObjectAccessNormalizer\Mocks\SumExample;
 
@@ -399,6 +404,38 @@ class ApieObjectAccessNormalizerTest extends TestCase
         $object->value2 = [new ClassWithNoTypehints('salami')];
         $object->value3 = new ClassWithNoTypehints(42);
         $this->assertEquals($expected, $serializer->normalize($object, null, ['groups' => ['missing']]));
+    }
+
+    public function testNormalizeWithPolymorphicRelation()
+    {
+        $objectAccess = new PolymorphicRelationObjectAccess(
+            BaseClass::class,
+            [
+                'mutable' => MutablePizza::class,
+                'salami' => SalamiPizza::class,
+                'valued' => ValueObjectPizza::class,
+            ],
+            'flavour'
+        );
+        $serializer = $this->createSerializer(
+            $objectAccess,
+            new CamelCaseToSnakeCaseNameConverter()
+        );
+
+        $actual = $serializer->normalize(new MutablePizza(), 'json');
+        $this->assertEquals(['flavour' => 'mutable', 'pizza' => '<empty pizza>', 'type' => 'pizza'], $actual);
+        $actual = $serializer->normalize(new SalamiPizza(), 'json');
+        $this->assertEquals(['flavour' => 'salami', 'pizza' => 'salami', 'type' => 'pizza', 'spiciness' => 42], $actual);
+        $actual = $serializer->normalize(new ValueObjectPizza('quattro formaggi'), 'json');
+        $this->assertEquals(['flavour' => 'valued', 'pizza' => 'quattro formaggi', 'type' => 'pizza'], $actual);
+
+        $context = ['groups' => ['get', 'base']];
+        $actual = $serializer->normalize(new MutablePizza(), 'json', $context);
+        $this->assertEquals(['flavour' => 'mutable'], $actual);
+        $actual = $serializer->normalize(new SalamiPizza(), 'json', $context);
+        $this->assertEquals(['flavour' => 'salami'], $actual);
+        $actual = $serializer->normalize(new ValueObjectPizza('quattro formaggi'), 'json', $context);
+        $this->assertEquals(['flavour' => 'valued'], $actual);
     }
 
     public function testDenormalizeWithOtherNameConverterAndGroups()

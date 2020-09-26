@@ -202,7 +202,8 @@ class ApieObjectAccessNormalizer implements NormalizerInterface, DenormalizerInt
     private function instantiate(array $data, string $type, ObjectAccessInterface $objectAccess, ?string $format = null, array $context = [])
     {
         $reflectionClass = new ReflectionClass($type);
-        $argumentTypes = $objectAccess->getConstructorArguments($reflectionClass);
+        // if more ObjectAccess require $data, we might need to update the interface. @see PolymorphicRelationObjectAccess
+        $argumentTypes = $objectAccess->getConstructorArguments($reflectionClass, $data);
         $errors = new ErrorBag($context['key_prefix']);
         $parsedArguments = [];
         foreach ($argumentTypes as $denormalizedFieldName => $argumentType) {
