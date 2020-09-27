@@ -7,6 +7,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\PropertyInfo\Type;
 use W2w\Lib\ApieObjectAccessNormalizer\Exceptions\NameNotFoundException;
+use W2w\Lib\ApieObjectAccessNormalizer\Interfaces\ObjectAccessWithNotFilterablePropertiesInterface;
 
 /**
  * Decorator around an Object Access to filter the properties that are accessible.
@@ -38,8 +39,12 @@ class FilteredObjectAccess implements ObjectAccessInterface
     public function getGetterFields(ReflectionClass $reflectionClass): array
     {
         $result = $this->objectAccess->getGetterFields($reflectionClass);
-        return array_values(array_filter($result, function (string $fieldName) {
-            return isset($this->filteredFields[$fieldName]);
+        $notFilterableProperties = [];
+        if ($this->objectAccess instanceof ObjectAccessWithNotFilterablePropertiesInterface) {
+            $notFilterableProperties = array_fill_keys($this->objectAccess->getNotFilterableProperties(), 1);
+        }
+        return array_values(array_filter($result, function (string $fieldName) use (&$notFilterableProperties) {
+            return isset($this->filteredFields[$fieldName]) || isset($notFilterableProperties[$fieldName]);
         }));
     }
 
@@ -93,7 +98,11 @@ class FilteredObjectAccess implements ObjectAccessInterface
      */
     public function getValue(object $instance, string $fieldName)
     {
-        if (!isset($this->filteredFields[$fieldName])) {
+        $notFilterableProperties = [];
+        if ($this->objectAccess instanceof ObjectAccessWithNotFilterablePropertiesInterface) {
+            $notFilterableProperties = array_fill_keys($this->objectAccess->getNotFilterableProperties(), 1);
+        }
+        if (!isset($this->filteredFields[$fieldName]) && !isset($notFilterableProperties[$fieldName])) {
             throw new NameNotFoundException($fieldName);
         }
         return $this->objectAccess->getValue($instance, $fieldName);
@@ -105,7 +114,11 @@ class FilteredObjectAccess implements ObjectAccessInterface
      */
     public function setValue(object $instance, string $fieldName, $value)
     {
-        if (!isset($this->filteredFields[$fieldName])) {
+        $notFilterableProperties = [];
+        if ($this->objectAccess instanceof ObjectAccessWithNotFilterablePropertiesInterface) {
+            $notFilterableProperties = array_fill_keys($this->objectAccess->getNotFilterableProperties(), 1);
+        }
+        if (!isset($this->filteredFields[$fieldName]) && !isset($notFilterableProperties[$fieldName])) {
             throw new NameNotFoundException($fieldName);
         }
         return $this->objectAccess->setValue($instance, $fieldName, $value);
